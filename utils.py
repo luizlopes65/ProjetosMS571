@@ -1,4 +1,5 @@
 import numpy as np
+from tqdm import tqdm
 
 def sigmoid(z):
     return 1/(1+np.exp(-z))
@@ -15,13 +16,13 @@ def computeCost(X,y,theta,input_layer_size,hidden_layer_size,num_labels, Lambda)
     m = X.shape[0]
     J = 0
     X = np.hstack((np.ones((m,1)),X))
-    y10 = np.zeros((m,num_labels))
+    y10 = np.zeros((m, num_labels))
     
     a1 = sigmoid(X @ theta1.T)
     a1 = np.hstack((np.ones((m,1)),a1))
     a2 = sigmoid(a1 @ theta2.T)
     
-    for i in range(1,num_labels+1):
+    for i in range(1, num_labels+1):
         y10[:,i-1][:,np.newaxis] = np.where(y==i,1,0)
     for j in range(num_labels):
         J = J + sum(-y10[:,j]*np.log(a2[:,j])-(1-y10[:,j])*np.log(1-a2[:,j]))
@@ -61,7 +62,7 @@ def gradientDescent(X,y,theta,alpha,nbr_iter,Lambda,input_layer_size,hidden_laye
     m = len(y)
     J_history = []
     
-    for i in range(nbr_iter):
+    for i in tqdm(range(nbr_iter)):
         theta = np.append(theta1.flatten(),theta2.flatten())
         cost,grad1,grad2 = computeCost(X,y,theta,input_layer_size,hidden_layer_size,num_labels,Lambda)[3:]
         theta1 = theta1 - (alpha*grad1)
