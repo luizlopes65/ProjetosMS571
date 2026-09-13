@@ -55,7 +55,18 @@ def randInitializeWeights(L_in,L_out):
     W = np.random.rand(L_out,L_in+1)*(2*epi)-epi
     return W
 
-def gradientDescent(X,y,theta,alpha,nbr_iter,Lambda,input_layer_size,hidden_layer_size,num_labels):
+def gradientDescent(
+    X,
+    y,
+    theta,
+    alpha,
+    nbr_iter,
+    Lambda,
+    input_layer_size,
+    hidden_layer_size,
+    num_labels,
+    snapshot_callback=None,
+):
     theta1 = theta[:((input_layer_size+1)*hidden_layer_size)].reshape(hidden_layer_size,input_layer_size+1)
     theta2 = theta[((input_layer_size+1)*hidden_layer_size):].reshape(num_labels,hidden_layer_size+1)
     
@@ -68,6 +79,9 @@ def gradientDescent(X,y,theta,alpha,nbr_iter,Lambda,input_layer_size,hidden_laye
         theta1 = theta1 - (alpha*grad1)
         theta2 = theta2 - (alpha*grad2)
         J_history.append(cost)
+
+        if snapshot_callback is not None:
+            snapshot_callback(i + 1, theta1, theta2)
         
     nn_paramsFinal = np.append(theta1.flatten(),theta2.flatten())
     return nn_paramsFinal,J_history

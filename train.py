@@ -34,10 +34,20 @@ def train_model(
     learning_rate=0.8,
     iterations=800,
     lambda_=1,
+    snapshot_every=None,
 ):
     initial_theta1 = randInitializeWeights(input_layer_size, hidden_layer_size)
     initial_theta2 = randInitializeWeights(hidden_layer_size, num_labels)
     initial_theta = np.append(initial_theta1.flatten(), initial_theta2.flatten())
+    snapshots = []
+
+    def save_snapshot(iteration, theta1, theta2):
+        if snapshot_every is not None and (
+            iteration == 1
+            or iteration % snapshot_every == 0
+            or iteration == iterations
+        ):
+            snapshots.append((iteration, theta1.copy(), theta2.copy()))
 
     theta, J_history = gradientDescent(
         X_treino,
@@ -49,26 +59,32 @@ def train_model(
         input_layer_size,
         hidden_layer_size,
         num_labels,
+        snapshot_callback=save_snapshot if snapshot_every is not None else None,
     )
 
     theta1_end = (input_layer_size + 1) * hidden_layer_size
     theta1 = theta[:theta1_end].reshape(hidden_layer_size, input_layer_size + 1)
     theta2 = theta[theta1_end:].reshape(num_labels, hidden_layer_size + 1)
 
-    return theta1, theta2, J_history
+    result = theta1, theta2, J_history, (initial_theta1, initial_theta2)
+    if snapshot_every is not None:
+        return result + (snapshots,)
+    return result
 
 
-X_treino, y_treino, X_valid, y_valid, X_teste, y_teste = get_data_partitioned()
+
+if __name__ == "__main__":
+    X_treino, y_treino, X_valid, y_valid, X_teste, y_teste = get_data_partitioned()
 
 
-theta1, theta2, J_history = train_model(X_treino, y_treino)
+    theta1, theta2, J_history, _ = train_model(X_treino, y_treino)
 
-X_teste = X_teste.to_numpy()
-y_teste = y_teste.to_numpy()
+    X_teste = X_teste.to_numpy()
+    y_teste = y_teste.to_numpy()
 
-pred = prediction(X_teste,theta1,theta2)
+    pred = prediction(X_teste,theta1,theta2)
 
-pred = np.asarray(pred).ravel()
-y_teste_flat = y_teste.ravel()
+    pred = np.asarray(pred).ravel()
+    y_teste_flat = y_teste.ravel()
 
-print("Training Set Accuracy:", np.mean(pred == y_teste_flat) * 100, "%")
+    print("Training Set Accuracy:", np.mean(pred == y_teste_flat) * 100, "%")
