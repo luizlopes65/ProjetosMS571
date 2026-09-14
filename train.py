@@ -76,30 +76,7 @@ def train_model(
 if __name__ == "__main__":
     X_treino, y_treino, X_valid, y_valid, X_teste, y_teste = get_data_partitioned()
 
-    X_valid = X_valid.to_numpy()
-    y_valid = y_valid.to_numpy()
-
-    lambda_list = [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1, 3, 10]
-    validation_accuracy = []
-
-    print("Validation Set Accuracy:")
-
-    for lambda_valid in lambda_list:
-        theta1_valid, theta2_valid, _, _ = train_model(X_treino, y_treino, lambda_=lambda_valid)
-
-        pred_valid = prediction(X_valid, theta1_valid, theta2_valid)
-
-        pred_valid = np.asarray(pred_valid).ravel()
-        y_teste_flat_valid = y_valid.ravel()
-
-        acc = np.mean(pred_valid == y_teste_flat_valid) * 100
-        validation_accuracy.append(acc)
-        print(" Lambda:", lambda_valid, ":", acc, "%")
-
-    best_index = np.argmax(validation_accuracy)
-    best_lambda = lambda_list[best_index]
-
-    theta1, theta2, J_history, _ = train_model(X_treino, y_treino, lambda_=best_lambda)
+    theta1, theta2, J_history, _ = train_model(X_treino, y_treino)
 
     X_teste = X_teste.to_numpy()
     y_teste = y_teste.to_numpy()
