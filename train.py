@@ -25,6 +25,12 @@ def get_data_partitioned(
     return X_treino, y_treino, X_valid, y_valid, X_teste, y_teste
 
 
+def predict_model(X, theta1, theta2):
+    """Retorna uma classe prevista para cada amostra de ``X``."""
+    predictions = prediction(np.asarray(X), theta1, theta2)
+    return np.asarray(predictions).ravel()
+
+
 def train_model(
     X_treino,
     y_treino,
@@ -81,9 +87,7 @@ if __name__ == "__main__":
     X_teste = X_teste.to_numpy()
     y_teste = y_teste.to_numpy()
 
-    pred = prediction(X_teste,theta1,theta2)
-
-    pred = np.asarray(pred).ravel()
+    pred = predict_model(X_teste, theta1, theta2)
     y_teste_flat = y_teste.ravel()
 
     print("Training Set Accuracy:", np.mean(pred == y_teste_flat) * 100, "%")
