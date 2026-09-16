@@ -6,7 +6,14 @@ from train import get_data_partitioned, predict_model, train_model
 LAMBDA_LIST = [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1, 3, 10]
 
 
-def search_lambda(X_treino, y_treino, X_valid, y_valid, lambda_list=LAMBDA_LIST):
+def search_lambda(
+    X_treino,
+    y_treino,
+    X_valid,
+    y_valid,
+    lambda_list=LAMBDA_LIST,
+    **train_kwargs,
+):
     """Select the lambda with the best validation-set accuracy."""
     X_valid = np.asarray(X_valid)
     y_valid = np.asarray(y_valid)
@@ -18,6 +25,7 @@ def search_lambda(X_treino, y_treino, X_valid, y_valid, lambda_list=LAMBDA_LIST)
             X_treino,
             y_treino,
             lambda_=lambda_valid,
+            **train_kwargs,
         )
         models_by_lambda[lambda_valid] = (theta1_valid, theta2_valid)
         pred_valid = predict_model(X_valid, theta1_valid, theta2_valid)
