@@ -14,7 +14,6 @@ def search_lambda(
     lambda_list=LAMBDA_LIST,
     **train_kwargs,
 ):
-    """Select the lambda with the best validation-set accuracy."""
     X_valid = np.asarray(X_valid)
     y_valid = np.asarray(y_valid)
     validation_accuracy = []
