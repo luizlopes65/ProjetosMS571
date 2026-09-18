@@ -1,10 +1,18 @@
 import math
+from pathlib import Path
+import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
 
-from lambda_search import LAMBDA_LIST, search_lambda
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from experiments.lambda_search import LAMBDA_LIST, search_lambda
 from train import get_data_partitioned, predict_model
+
+PROCESSED_DATA_PATH = PROJECT_ROOT / "processed_data.csv"
 
 
 def infer_image_shape(num_features):
@@ -61,7 +69,7 @@ def plot_error_cases(
 
 
 def run_error_cases_visualization(
-    file_path="processed_data.csv",
+    file_path=PROCESSED_DATA_PATH,
     lambda_list=LAMBDA_LIST,
     hidden_layer_size=25,
     iterations=800,

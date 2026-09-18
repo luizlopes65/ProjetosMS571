@@ -2,12 +2,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
-import os
+from pathlib import Path
 
-pasta_atual = os.getcwd()
+PROJECT_ROOT = Path(__file__).resolve().parent
+DATA_DIR = PROJECT_ROOT / "data"
+PROCESSED_DATA_PATH = PROJECT_ROOT / "processed_data.csv"
 
-labels_df = pd.read_csv(os.path.join(pasta_atual, "data", "labels.csv"), header=None)
-images_df = pd.read_csv(os.path.join(pasta_atual,"data", "images.csv"), header=None)
+labels_df = pd.read_csv(DATA_DIR / "labels.csv", header=None)
+images_df = pd.read_csv(DATA_DIR / "images.csv", header=None)
 
 X = []
 y = []
@@ -25,5 +27,4 @@ for i in tqdm(range(0, 5000)):
 final_df = pd.DataFrame(X)
 final_df["label"] = y  
 
-final_df.to_csv(os.path.join(pasta_atual,"data", "processed_data.csv"), index=False, header=False)
-
+final_df.to_csv(PROCESSED_DATA_PATH, index=False, header=False)

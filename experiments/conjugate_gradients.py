@@ -1,5 +1,12 @@
+from pathlib import Path
+import sys
+
 import numpy as np
 from scipy.optimize import minimize
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 from train import get_data_partitioned, predict_model, train_model
 from utils import computeCost, randInitializeWeights

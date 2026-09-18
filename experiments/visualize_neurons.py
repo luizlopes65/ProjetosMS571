@@ -1,9 +1,17 @@
 from math import ceil, sqrt
+from pathlib import Path
+import sys
 
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, PillowWriter
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 from train import get_data_partitioned, train_model
+
+VISUALIZATIONS_DIR = PROJECT_ROOT / "visualizations"
 
 
 def normalize(image):
@@ -44,7 +52,11 @@ def plot_activation_images(theta1):
     plt.show()
 
 
-def create_activation_gif(snapshots, output_path="visualizations/activation_evolution.gif"):
+def create_activation_gif(
+    snapshots, output_path=VISUALIZATIONS_DIR / "activation_evolution.gif"
+):
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     num_neurons = snapshots[0][1].shape[0]
     fig, axes = create_activation_grid(num_neurons)
     images = []

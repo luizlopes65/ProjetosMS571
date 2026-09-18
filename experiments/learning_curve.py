@@ -1,14 +1,22 @@
 from __future__ import annotations
 
 from pathlib import Path
+import sys
 from typing import Iterable
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from lambda_search import LAMBDA_LIST
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from experiments.lambda_search import LAMBDA_LIST, search_lambda
 from train import predict_model, train_model
+
+PROCESSED_DATA_PATH = PROJECT_ROOT / "processed_data.csv"
+VISUALIZATIONS_DIR = PROJECT_ROOT / "visualizations"
 
 
 DEFAULT_VALIDATION_SIZE = 1_000
@@ -16,19 +24,20 @@ DEFAULT_MIN_TRAIN_SIZE = 100
 DEFAULT_NUM_POINTS = 6
 
 # Configuração da execução direta do script.
-FILE_PATH = "processed_data.csv"
+FILE_PATH = PROCESSED_DATA_PATH
 VALIDATION_SIZE = DEFAULT_VALIDATION_SIZE
 MIN_TRAIN_SIZE = DEFAULT_MIN_TRAIN_SIZE
 NUM_POINTS = DEFAULT_NUM_POINTS
 HIDDEN_LAYER_SIZE = 25
 ITERATIONS = 800
 LEARNING_RATE = 0.8
-LAMBDA_VALUES = LAMBDA_LIST
-OUTPUT_PATH = "visualizations/learning_curves_by_lambda.png"
+LAMBDA_CANDIDATES = LAMBDA_LIST
+OUTPUT_PATH = VISUALIZATIONS_DIR / "learning_curve.png"
+PARTITION_CURVES_OUTPUT_PATH = VISUALIZATIONS_DIR / "learning_curve_by_train_size.png"
 
 
 def split_train_and_validation(
-    file_path: str | Path = "processed_data.csv",
+    file_path: str | Path = PROCESSED_DATA_PATH,
     validation_size: int = DEFAULT_VALIDATION_SIZE,
     random_state: int = 42,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -77,8 +86,38 @@ def _train_with_seed(seed: int, *args, **kwargs):
         np.random.set_state(previous_state)
 
 
+def plot_partition_learning_curves(
+    train_sizes: np.ndarray,
+    cost_histories: list[np.ndarray],
+    lambda_: float,
+) -> plt.Figure:
+    """Cria uma grade com a evolução do custo para cada tamanho de treino."""
+    num_columns = min(3, len(train_sizes))
+    num_rows = int(np.ceil(len(train_sizes) / num_columns))
+    fig, axes = plt.subplots(
+        num_rows,
+        num_columns,
+        figsize=(5 * num_columns, 3.6 * num_rows),
+        squeeze=False,
+    )
+
+    for axis, size, history in zip(axes.flat, train_sizes, cost_histories):
+        axis.plot(np.arange(1, len(history) + 1), history)
+        axis.set_title(f"Treino com {size} exemplos")
+        axis.set_xlabel("Iteração")
+        axis.set_ylabel("Custo regularizado")
+        axis.grid(alpha=0.3)
+
+    for axis in axes.flat[len(train_sizes):]:
+        axis.set_visible(False)
+
+    fig.suptitle(f"Evolução do custo por tamanho de treino ($\\lambda$={lambda_})")
+    fig.tight_layout()
+    return fig
+
+
 def run_learning_curve(
-    file_path: str | Path = "processed_data.csv",
+    file_path: str | Path = PROCESSED_DATA_PATH,
     validation_size: int = DEFAULT_VALIDATION_SIZE,
     train_sizes: Iterable[int] | None = None,
     min_train_size: int = DEFAULT_MIN_TRAIN_SIZE,
@@ -89,8 +128,9 @@ def run_learning_curve(
     learning_rate: float = 0.8,
     lambda_: float = 1.0,
     output_path: str | Path | None = None,
+    partition_curves_output_path: str | Path | None = None,
     show: bool = True,
-) -> dict[str, np.ndarray | int]:
+) -> dict[str, np.ndarray | int | list[np.ndarray]]:
 
     X_pool, y_pool, X_valid, y_valid = split_train_and_validation(
         file_path=file_path,
@@ -111,11 +151,12 @@ def run_learning_curve(
     num_labels = int(max(y_pool.max(), y_valid.max()))
     train_errors = []
     validation_errors = []
+    cost_histories = []
 
     print("tamanho_treino | erro_treino (%) | erro_validacao (%)")
     for point_index, size in enumerate(sizes):
         X_train, y_train = X_pool[:size], y_pool[:size]
-        theta1, theta2, _, _ = _train_with_seed(
+        theta1, theta2, cost_history, _ = _train_with_seed(
             random_state + point_index,
             X_train,
             y_train,
@@ -135,6 +176,7 @@ def run_learning_curve(
         )
         train_errors.append(train_error)
         validation_errors.append(validation_error)
+        cost_histories.append(np.asarray(cost_history))
         print(f"{size:15d} | {train_error:15.2f} | {validation_error:18.2f}")
 
     train_errors_array = np.asarray(train_errors)
@@ -160,23 +202,44 @@ def run_learning_curve(
         fig.savefig(output_path, dpi=150)
         print(f"Gráfico salvo em: {output_path}")
 
+    partition_fig = None
+    if partition_curves_output_path is not None:
+        partition_fig = plot_partition_learning_curves(sizes, cost_histories, lambda_)
+        partition_curves_output_path = Path(partition_curves_output_path)
+        partition_curves_output_path.parent.mkdir(parents=True, exist_ok=True)
+        partition_fig.savefig(partition_curves_output_path, dpi=150)
+        print(f"Gráfico salvo em: {partition_curves_output_path}")
+
     if show:
         plt.show()
     else:
         plt.close(fig)
+        if partition_fig is not None:
+            plt.close(partition_fig)
 
     return {
         "train_sizes": sizes,
         "train_errors": train_errors_array,
         "validation_errors": validation_errors_array,
+        "cost_histories": cost_histories,
         "validation_size": validation_size,
     }
 
 
-def run_learning_curves_by_lambda(
-    lambda_values: Iterable[float] = LAMBDA_LIST,
-    file_path: str | Path = "processed_data.csv",
+def _search_lambda_with_seed(seed: int, *args, **kwargs):
+    """Executa a busca de regularização sem alterar o gerador global."""
+    previous_state = np.random.get_state()
+    np.random.seed(seed)
+    try:
+        return search_lambda(*args, **kwargs)
+    finally:
+        np.random.set_state(previous_state)
+
+
+def run_learning_curve_with_best_lambda(
+    file_path: str | Path = PROCESSED_DATA_PATH,
     validation_size: int = DEFAULT_VALIDATION_SIZE,
+    lambda_candidates: Iterable[float] = LAMBDA_LIST,
     train_sizes: Iterable[int] | None = None,
     min_train_size: int = DEFAULT_MIN_TRAIN_SIZE,
     num_points: int = DEFAULT_NUM_POINTS,
@@ -185,88 +248,67 @@ def run_learning_curves_by_lambda(
     iterations: int = 800,
     learning_rate: float = 0.8,
     output_path: str | Path | None = None,
+    partition_curves_output_path: str | Path | None = None,
     show: bool = True,
-) -> dict[float, dict[str, np.ndarray | int]]:
-    """Gera uma curva de treino/validação para cada configuração de ``lambda``.
+) -> dict[str, np.ndarray | int | float | list[np.ndarray]]:
+    """Seleciona o melhor ``lambda`` e gera uma única curva de aprendizado."""
+    X_pool, y_pool, X_valid, y_valid = split_train_and_validation(
+        file_path=file_path,
+        validation_size=validation_size,
+        random_state=random_state,
+    )
+    input_layer_size = X_pool.shape[1]
+    num_labels = int(max(y_pool.max(), y_valid.max()))
 
-    Todas as configurações usam a mesma partição e os mesmos tamanhos de
-    treino. Para cada tamanho, a inicialização também é a mesma entre valores
-    de ``lambda``, deixando a regularização como única diferença experimental.
-    """
-    lambdas = np.unique(np.asarray(list(lambda_values), dtype=float))
-    if len(lambdas) == 0:
-        raise ValueError("Informe pelo menos uma configuração de lambda.")
-
-    results: dict[float, dict[str, np.ndarray | int]] = {}
-    for lambda_value in lambdas:
-        print(f"\nConfiguração: lambda={lambda_value:g}")
-        results[float(lambda_value)] = run_learning_curve(
-            file_path=file_path,
-            validation_size=validation_size,
-            train_sizes=train_sizes,
-            min_train_size=min_train_size,
-            num_points=num_points,
-            random_state=random_state,
-            hidden_layer_size=hidden_layer_size,
-            iterations=iterations,
-            learning_rate=learning_rate,
-            lambda_=float(lambda_value),
-            show=False,
-        )
-
-    num_columns = min(3, len(lambdas))
-    num_rows = int(np.ceil(len(lambdas) / num_columns))
-    fig, axes = plt.subplots(
-        num_rows,
-        num_columns,
-        figsize=(5 * num_columns, 3.8 * num_rows),
-        sharex=True,
-        sharey=True,
-        squeeze=False,
+    best_lambda, validation_accuracy, _ = _search_lambda_with_seed(
+        random_state,
+        X_pool,
+        y_pool,
+        X_valid,
+        y_valid,
+        lambda_list=list(lambda_candidates),
+        input_layer_size=input_layer_size,
+        hidden_layer_size=hidden_layer_size,
+        num_labels=num_labels,
+        iterations=iterations,
+        learning_rate=learning_rate,
+    )
+    best_validation_accuracy = validation_accuracy[np.argmax(validation_accuracy)]
+    print(
+        f"\nLambda ótimo: {best_lambda} "
+        f"(acurácia na validação: {best_validation_accuracy:.2f}%)"
     )
 
-    for axis, lambda_value in zip(axes.flat, lambdas):
-        result = results[float(lambda_value)]
-        sizes = np.asarray(result["train_sizes"])
-        axis.plot(sizes, result["train_errors"], "o-", label="Treino")
-        axis.plot(sizes, result["validation_errors"], "o-", label="Validação fixa")
-        axis.set_title(f"$\\lambda$ = {lambda_value:g}")
-        axis.grid(alpha=0.3)
-
-    for axis in axes.flat[len(lambdas):]:
-        axis.set_visible(False)
-
-    axes[0, 0].legend()
-    fig.supxlabel("Número de exemplos de treino")
-    fig.supylabel("Erro de classificação (%)")
-    fig.suptitle(
-        f"Curvas de aprendizado por regularização (validação fixa: {validation_size})"
+    result = run_learning_curve(
+        file_path=file_path,
+        validation_size=validation_size,
+        train_sizes=train_sizes,
+        min_train_size=min_train_size,
+        num_points=num_points,
+        random_state=random_state,
+        hidden_layer_size=hidden_layer_size,
+        iterations=iterations,
+        learning_rate=learning_rate,
+        lambda_=best_lambda,
+        output_path=output_path,
+        partition_curves_output_path=partition_curves_output_path,
+        show=show,
     )
-    fig.tight_layout()
-
-    if output_path is not None:
-        output_path = Path(output_path)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(output_path, dpi=150)
-        print(f"\nGráfico salvo em: {output_path}")
-
-    if show:
-        plt.show()
-    else:
-        plt.close(fig)
-
-    return results
+    result["best_lambda"] = float(best_lambda)
+    result["best_validation_accuracy"] = float(best_validation_accuracy)
+    return result
 
 
 if __name__ == "__main__":
-    run_learning_curves_by_lambda(
-        lambda_values=LAMBDA_VALUES,
+    run_learning_curve_with_best_lambda(
         file_path=FILE_PATH,
         validation_size=VALIDATION_SIZE,
+        lambda_candidates=LAMBDA_CANDIDATES,
         min_train_size=MIN_TRAIN_SIZE,
         num_points=NUM_POINTS,
         hidden_layer_size=HIDDEN_LAYER_SIZE,
         iterations=ITERATIONS,
         learning_rate=LEARNING_RATE,
         output_path=OUTPUT_PATH,
+        partition_curves_output_path=PARTITION_CURVES_OUTPUT_PATH,
     )

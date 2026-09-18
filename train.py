@@ -1,10 +1,15 @@
+from pathlib import Path
+
 from utils import randInitializeWeights, prediction, gradientDescent
-import numpy as np 
+import numpy as np
 import pandas as pd
 
 
+PROCESSED_DATA_PATH = Path(__file__).resolve().with_name("processed_data.csv")
+
+
 def get_data_partitioned(
-    file_path="processed_data.csv",
+    file_path=PROCESSED_DATA_PATH,
     pct_valid=0.04,
     pct_teste=0.2,
     random_state=42,
