@@ -1,6 +1,12 @@
 from pathlib import Path
 
-from utils import randInitializeWeights, prediction, gradientDescent
+from utils import (
+    randInitializeAllWeights,
+    unpack_thetas,
+    pack_thetas,
+    prediction,
+    gradientDescent,
+)
 import numpy as np
 import pandas as pd
 
@@ -30,9 +36,9 @@ def get_data_partitioned(
     return X_treino, y_treino, X_valid, y_valid, X_teste, y_teste
 
 
-def predict_model(X, theta1, theta2):
+def predict_model(X, thetas):
     """Retorna uma classe prevista para cada amostra de ``X``."""
-    predictions = prediction(np.asarray(X), theta1, theta2)
+    predictions = prediction(np.asarray(X), thetas)
     return np.asarray(predictions).ravel()
 
 
@@ -40,25 +46,25 @@ def train_model(
     X_treino,
     y_treino,
     input_layer_size=400,
-    hidden_layer_size=25,
+    hidden_layer_sizes=[25],
     num_labels=10,
     learning_rate=0.8,
     iterations=800,
     lambda_=1,
     snapshot_every=None,
 ):
-    initial_theta1 = randInitializeWeights(input_layer_size, hidden_layer_size)
-    initial_theta2 = randInitializeWeights(hidden_layer_size, num_labels)
-    initial_theta = np.append(initial_theta1.flatten(), initial_theta2.flatten())
+    layer_sizes = [input_layer_size, *hidden_layer_sizes, num_labels]
+    initial_thetas = randInitializeAllWeights(layer_sizes)
+    initial_theta = pack_thetas(initial_thetas)
     snapshots = []
 
-    def save_snapshot(iteration, theta1, theta2):
+    def save_snapshot(iteration, thetas):
         if snapshot_every is not None and (
             iteration == 1
             or iteration % snapshot_every == 0
             or iteration == iterations
         ):
-            snapshots.append((iteration, theta1.copy(), theta2.copy()))
+            snapshots.append((iteration, [t.copy() for t in thetas]))
 
     theta, J_history = gradientDescent(
         X_treino,
@@ -67,32 +73,27 @@ def train_model(
         learning_rate,
         iterations,
         lambda_,
-        input_layer_size,
-        hidden_layer_size,
-        num_labels,
+        layer_sizes,
         snapshot_callback=save_snapshot if snapshot_every is not None else None,
     )
 
-    theta1_end = (input_layer_size + 1) * hidden_layer_size
-    theta1 = theta[:theta1_end].reshape(hidden_layer_size, input_layer_size + 1)
-    theta2 = theta[theta1_end:].reshape(num_labels, hidden_layer_size + 1)
+    thetas = unpack_thetas(theta, layer_sizes)
 
-    result = theta1, theta2, J_history, (initial_theta1, initial_theta2)
+    result = thetas, J_history, initial_thetas
     if snapshot_every is not None:
         return result + (snapshots,)
     return result
 
 
-
 if __name__ == "__main__":
     X_treino, y_treino, X_valid, y_valid, X_teste, y_teste = get_data_partitioned()
 
-    theta1, theta2, J_history, _ = train_model(X_treino, y_treino)
+    thetas, J_history, _ = train_model(X_treino, y_treino)
 
     X_teste = X_teste.to_numpy()
     y_teste = y_teste.to_numpy()
 
-    pred = predict_model(X_teste, theta1, theta2)
+    pred = predict_model(X_teste, thetas)
     y_teste_flat = y_teste.ravel()
 
-    print("Training Set Accuracy:", np.mean(pred == y_teste_flat) * 100, "%")
+    print("Test Set Accuracy:", np.mean(pred == y_teste_flat) * 100, "%")

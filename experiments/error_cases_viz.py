@@ -71,7 +71,7 @@ def plot_error_cases(
 def run_error_cases_visualization(
     file_path=PROCESSED_DATA_PATH,
     lambda_list=LAMBDA_LIST,
-    hidden_layer_size=25,
+    hidden_layer_sizes=[25],
     iterations=800,
     max_images=25,
     image_shape=None,
@@ -97,14 +97,14 @@ def run_error_cases_visualization(
         y_valid,
         lambda_list=lambda_list,
         input_layer_size=input_layer_size,
-        hidden_layer_size=hidden_layer_size,
+        hidden_layer_sizes=hidden_layer_sizes,
         num_labels=num_labels,
         iterations=iterations,
     )
 
-    theta1, theta2 = models_by_lambda[best_lambda]
+    thetas = models_by_lambda[best_lambda]
     y_true = np.asarray(y_teste).ravel()
-    y_pred = predict_model(X_teste, theta1, theta2)
+    y_pred = predict_model(X_teste, thetas)
     accuracy = np.mean(y_true == y_pred) * 100
     best_validation_accuracy = validation_accuracy[np.argmax(validation_accuracy)]
 

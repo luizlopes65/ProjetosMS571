@@ -9,89 +9,108 @@ def sigmoidGradient(z):
     sigmoid = 1/(1+np.exp(-z))
     return sigmoid*(1-sigmoid)
 
-def computeCost(X,y,theta,input_layer_size,hidden_layer_size,num_labels, Lambda):
-    theta1 = theta[:((input_layer_size+1)*hidden_layer_size)].reshape(hidden_layer_size,input_layer_size+1)
-    theta2 = theta[((input_layer_size+1)*hidden_layer_size):].reshape(num_labels,hidden_layer_size+1)
-    
+
+def unpack_thetas(theta, layer_sizes):
+    """Desempacota o vetor 1D ``theta`` em uma lista de matrizes de peso,
+    uma por transição entre camadas consecutivas de ``layer_sizes``
+    (layer_sizes[0] = entrada, layer_sizes[-1] = número de classes)."""
+    thetas = []
+    offset = 0
+    for l_in, l_out in zip(layer_sizes[:-1], layer_sizes[1:]):
+        size = l_out * (l_in + 1)
+        thetas.append(theta[offset:offset + size].reshape(l_out, l_in + 1))
+        offset += size
+    return thetas
+
+
+def pack_thetas(thetas):
+    """Empacota a lista de matrizes de peso de volta em um único vetor 1D."""
+    return np.concatenate([t.ravel() for t in thetas])
+
+
+def randInitializeWeights(L_in, L_out):
+    epi = (6**(1/2))/(L_in+L_out)**(1/2)
+    W = np.random.rand(L_out, L_in+1)*(2*epi)-epi
+    return W
+
+
+def randInitializeAllWeights(layer_sizes):
+    """Inicializa aleatoriamente a lista completa de pesos, uma matriz por
+    transição entre camadas consecutivas de ``layer_sizes``."""
+    return [randInitializeWeights(l_in, l_out)
+            for l_in, l_out in zip(layer_sizes[:-1], layer_sizes[1:])]
+
+
+def computeCost(X, y, theta, layer_sizes, num_labels, Lambda):
+    thetas = unpack_thetas(theta, layer_sizes)
+    L = len(thetas)
+
     m = X.shape[0]
     J = 0
     X = np.hstack((np.ones((m,1)),X))
     y10 = np.zeros((m, num_labels))
-    
-    a1 = sigmoid(X @ theta1.T)
-    a1 = np.hstack((np.ones((m,1)),a1))
-    a2 = sigmoid(a1 @ theta2.T)
-    
+
+    # Passada para frente (generalizada para N camadas)
+    a = [X]                                    # a[0] = entrada com bias
+    for l, theta_l in enumerate(thetas):
+        a_next = sigmoid(a[-1] @ theta_l.T)
+        if l < L-1:                            # camadas escondidas ganham bias
+            a_next = np.hstack((np.ones((m,1)),a_next))
+        a.append(a_next)
+    a2 = a[-1]                                 # saída (sem bias)
+
     for i in range(1, num_labels+1):
         y10[:,i-1][:,np.newaxis] = np.where(y==i,1,0)
     for j in range(num_labels):
         J = J + sum(-y10[:,j]*np.log(a2[:,j])-(1-y10[:,j])*np.log(1-a2[:,j]))
-        
+
     cost = 1/m*J
-    reg_J = cost + Lambda/(2*m)*(np.sum(theta1[:,1:]**2)+np.sum(theta2[:,1:]**2))
-                                 
-    grad1 = np.zeros((theta1.shape))
-    grad2 = np.zeros((theta2.shape))
-                                 
+    reg_J = cost + Lambda/(2*m)*sum(np.sum(theta_l[:,1:]**2) for theta_l in thetas)
+
+    # Backpropagation (por amostra, generalizado para N camadas)
+    grad = [np.zeros((theta_l.shape)) for theta_l in thetas]
     for i in range(m):
         xi = X[i,:]
-        a1i = a1[i,:]
-        a2i = a2[i,:]
-        d2 = a2i - y10[i,:]
-        d1 = theta2.T @ d2.T * sigmoidGradient(np.hstack((1,xi @ theta1.T)))
-        grad1 = grad1 + d1[1:][:,np.newaxis]@xi[:,np.newaxis].T
-        grad2 = grad2 + d2.T[:,np.newaxis]@a1i[:,np.newaxis].T
-                                 
-    grad1 = 1/m*grad1
-    grad2 = 1/m*grad2
-                                 
-    grad1_reg = grad1 + (Lambda/m)*np.hstack((np.zeros((theta1.shape[0],1)),theta1[:,1:]))
-    grad2_reg = grad2 + (Lambda/m)*np.hstack((np.zeros((theta2.shape[0],1)),theta2[:,1:]))
-                                 
-    return cost,grad1,grad2,reg_J,grad1_reg,grad2_reg
+        a_i = [a_k[i,:] for a_k in a]          # ativações desta amostra
+        d = [None]*L
+        d[L-1] = a_i[-1] - y10[i,:]            # d2 = a2i - y10[i,:]
+        for l in range(L-2, -1, -1):
+            d[l] = thetas[l+1].T @ d[l+1] * sigmoidGradient(np.hstack((1, a_i[l] @ thetas[l].T)))
+            d[l] = d[l][1:]                    # descarta o bias, como d1[1:] no original
+        for l in range(L):
+            grad[l] = grad[l] + d[l][:,np.newaxis] @ a_i[l][:,np.newaxis].T
 
-def randInitializeWeights(L_in,L_out):
-    epi = (6**(1/2))/(L_in+L_out)**(1/2)
-    W = np.random.rand(L_out,L_in+1)*(2*epi)-epi
-    return W
+    grad = [g/m for g in grad]
+    grad_reg = [g + (Lambda/m)*np.hstack((np.zeros((theta_l.shape[0],1)), theta_l[:,1:]))
+                for g, theta_l in zip(grad, thetas)]
 
-def gradientDescent(
-    X,
-    y,
-    theta,
-    alpha,
-    nbr_iter,
-    Lambda,
-    input_layer_size,
-    hidden_layer_size,
-    num_labels,
-    snapshot_callback=None,
-):
-    theta1 = theta[:((input_layer_size+1)*hidden_layer_size)].reshape(hidden_layer_size,input_layer_size+1)
-    theta2 = theta[((input_layer_size+1)*hidden_layer_size):].reshape(num_labels,hidden_layer_size+1)
-    
-    m = len(y)
+    return cost, grad, reg_J, grad_reg
+
+
+def gradientDescent(X, y, theta, alpha, nbr_iter, Lambda, layer_sizes, snapshot_callback=None):
+    thetas = unpack_thetas(theta, layer_sizes)
     J_history = []
-    
+
     for i in tqdm(range(nbr_iter)):
-        theta = np.append(theta1.flatten(),theta2.flatten())
-        cost,grad1,grad2 = computeCost(X,y,theta,input_layer_size,hidden_layer_size,num_labels,Lambda)[3:]
-        theta1 = theta1 - (alpha*grad1)
-        theta2 = theta2 - (alpha*grad2)
+        theta = pack_thetas(thetas)
+        cost, grad = computeCost(X, y, theta, layer_sizes, layer_sizes[-1], Lambda)[2:]  # regularizados
+        thetas = [t - (alpha*g) for t, g in zip(thetas, grad)]
         J_history.append(cost)
 
         if snapshot_callback is not None:
-            snapshot_callback(i + 1, theta1, theta2)
-        
-    nn_paramsFinal = np.append(theta1.flatten(),theta2.flatten())
-    return nn_paramsFinal,J_history
+            snapshot_callback(i + 1, [t.copy() for t in thetas])
 
-def prediction(X,theta1,theta2):
+    nn_paramsFinal = pack_thetas(thetas)
+    return nn_paramsFinal, J_history
+
+
+def prediction(X, theta):
     m = X.shape[0]
     X = np.hstack((np.ones((m,1)),X))
-    
-    a1 = sigmoid(X @ theta1.T)
-    a1 = np.hstack((np.ones((m,1)),a1))
-    a2 = sigmoid(a1 @ theta2.T)
-    
-    return np.argmax(a2,axis=1)+1
+
+    a = X
+    for theta_l in theta:
+        a = sigmoid(a @ theta_l.T)
+        a = np.hstack((np.ones((m,1)),a))
+
+    return np.argmax(a[:,1:],axis=1)+1
