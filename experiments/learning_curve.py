@@ -28,7 +28,7 @@ FILE_PATH = PROCESSED_DATA_PATH
 VALIDATION_SIZE = DEFAULT_VALIDATION_SIZE
 MIN_TRAIN_SIZE = DEFAULT_MIN_TRAIN_SIZE
 NUM_POINTS = DEFAULT_NUM_POINTS
-HIDDEN_LAYER_SIZE = 25
+HIDDEN_LAYER_SIZES = [25]
 ITERATIONS = 800
 LEARNING_RATE = 0.8
 LAMBDA_CANDIDATES = LAMBDA_LIST
@@ -123,7 +123,7 @@ def run_learning_curve(
     min_train_size: int = DEFAULT_MIN_TRAIN_SIZE,
     num_points: int = DEFAULT_NUM_POINTS,
     random_state: int = 42,
-    hidden_layer_size: int = 25,
+    hidden_layer_sizes: list[int] = [25],
     iterations: int = 800,
     learning_rate: float = 0.8,
     lambda_: float = 1.0,
@@ -156,12 +156,12 @@ def run_learning_curve(
     print("tamanho_treino | erro_treino (%) | erro_validacao (%)")
     for point_index, size in enumerate(sizes):
         X_train, y_train = X_pool[:size], y_pool[:size]
-        theta1, theta2, cost_history, _ = _train_with_seed(
+        thetas, cost_history, _ = _train_with_seed(
             random_state + point_index,
             X_train,
             y_train,
             input_layer_size=input_layer_size,
-            hidden_layer_size=hidden_layer_size,
+            hidden_layer_sizes=hidden_layer_sizes,
             num_labels=num_labels,
             learning_rate=learning_rate,
             iterations=iterations,
@@ -169,10 +169,10 @@ def run_learning_curve(
         )
 
         train_error = classification_error(
-            y_train, predict_model(X_train, theta1, theta2)
+            y_train, predict_model(X_train, thetas)
         )
         validation_error = classification_error(
-            y_valid, predict_model(X_valid, theta1, theta2)
+            y_valid, predict_model(X_valid, thetas)
         )
         train_errors.append(train_error)
         validation_errors.append(validation_error)
@@ -244,7 +244,7 @@ def run_learning_curve_with_best_lambda(
     min_train_size: int = DEFAULT_MIN_TRAIN_SIZE,
     num_points: int = DEFAULT_NUM_POINTS,
     random_state: int = 42,
-    hidden_layer_size: int = 25,
+    hidden_layer_sizes: list[int] = [25],
     iterations: int = 800,
     learning_rate: float = 0.8,
     output_path: str | Path | None = None,
@@ -268,7 +268,7 @@ def run_learning_curve_with_best_lambda(
         y_valid,
         lambda_list=list(lambda_candidates),
         input_layer_size=input_layer_size,
-        hidden_layer_size=hidden_layer_size,
+        hidden_layer_sizes=hidden_layer_sizes,
         num_labels=num_labels,
         iterations=iterations,
         learning_rate=learning_rate,
@@ -286,7 +286,7 @@ def run_learning_curve_with_best_lambda(
         min_train_size=min_train_size,
         num_points=num_points,
         random_state=random_state,
-        hidden_layer_size=hidden_layer_size,
+        hidden_layer_sizes=hidden_layer_sizes,
         iterations=iterations,
         learning_rate=learning_rate,
         lambda_=best_lambda,
@@ -306,7 +306,7 @@ if __name__ == "__main__":
         lambda_candidates=LAMBDA_CANDIDATES,
         min_train_size=MIN_TRAIN_SIZE,
         num_points=NUM_POINTS,
-        hidden_layer_size=HIDDEN_LAYER_SIZE,
+        hidden_layer_sizes=HIDDEN_LAYER_SIZES,
         iterations=ITERATIONS,
         learning_rate=LEARNING_RATE,
         output_path=OUTPUT_PATH,

@@ -57,13 +57,13 @@ def create_activation_gif(
 ):
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    num_neurons = snapshots[0][1].shape[0]
+    num_neurons = snapshots[0][1][0].shape[0]  # snapshots[0][1] é a lista de thetas; [0] = 1ª camada
     fig, axes = create_activation_grid(num_neurons)
     images = []
 
     for neuron in range(num_neurons):
         ax = axes[neuron]
-        image = snapshots[0][1][neuron, 1:].reshape(20, 20)
+        image = snapshots[0][1][0][neuron, 1:].reshape(20, 20)
         images.append(ax.imshow(normalize(image), cmap="gray", vmin=0, vmax=1))
         ax.set_title(f"Neurônio {neuron + 1}")
         ax.axis("off")
@@ -72,10 +72,10 @@ def create_activation_gif(
         ax.axis("off")
 
     def update(frame):
-        iteration, theta1_snapshot, _ = snapshots[frame]
+        iteration, thetas_snapshot = snapshots[frame]
 
         for neuron, image_plot in enumerate(images):
-            image = theta1_snapshot[neuron, 1:].reshape(20, 20)
+            image = thetas_snapshot[0][neuron, 1:].reshape(20, 20)
             image_plot.set_data(normalize(image))
 
         fig.suptitle(f"Evolução dos pesos — iteração {iteration}")
@@ -94,11 +94,11 @@ def create_activation_gif(
 
 if __name__ == "__main__":
     X_treino, y_treino, _, _, _, _ = get_data_partitioned()
-    theta1, _, _, _, snapshots = train_model(
+    thetas, _, _, snapshots = train_model(
         X_treino,
         y_treino,
         snapshot_every=10,
     )
-    plot_activation_images(theta1)
+    plot_activation_images(thetas[0])  # primeira camada: entrada -> 1ª escondida (20x20)
     create_activation_gif(snapshots)
     print("GIF salvo em activation_evolution.gif")
