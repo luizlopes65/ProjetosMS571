@@ -1,0 +1,10 @@
+experiments/__pycache__/error_cases_viz.cpython-311.pyc
+__pycache__/train.cpython-311.pyc
+experiments/__pycache__/lambda_search.cpython-311.pyc
+.DS_Store
+__pycache__/utils.cpython-311.pyc
+experiments/__pycache__/conjugate_gradients.cpython-311.pyc
+experiments/__pycache__/gradient_check.cpython-311.pyc
+experiments/__pycache__/learning_curve.cpython-311.pyc
+experiments/__pycache__/visualize_neurons.cpython-311.pyc
+visualizations/validation_error_vs_lambda.png
