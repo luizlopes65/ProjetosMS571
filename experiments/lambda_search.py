@@ -2,7 +2,6 @@ from pathlib import Path
 import sys
 
 import matplotlib.pyplot as plt
-import matplotlib.pyplot as plt
 import numpy as np
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -16,19 +15,19 @@ LAMBDA_LIST = [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1, 3, 10]
 DEFAULT_PLOT_PATH = PROJECT_ROOT / "visualizations" / "lambda_search_costs.png"
 
 
-def classification_cost(X, y, theta1, theta2, num_labels):
-
+def classification_cost(X, y, thetas, num_labels):
+    """Calcula a entropia cruzada para uma lista de matrizes de pesos."""
     X = np.asarray(X, dtype=float)
     y = np.asarray(y).ravel()
     m = X.shape[0]
 
-    X_with_bias = np.hstack((np.ones((m, 1)), X))
-    hidden = 1 / (1 + np.exp(-(X_with_bias @ theta1.T)))
-    hidden_with_bias = np.hstack((np.ones((m, 1)), hidden))
-    probabilities = 1 / (1 + np.exp(-(hidden_with_bias @ theta2.T)))
+    activations = np.hstack((np.ones((m, 1)), X))
+    for theta in thetas:
+        activations = 1 / (1 + np.exp(-(activations @ theta.T)))
+        activations = np.hstack((np.ones((m, 1)), activations))
 
+    probabilities = np.clip(activations[:, 1:], 1e-12, 1 - 1e-12)
     targets = (y[:, np.newaxis] == np.arange(1, num_labels + 1)).astype(float)
-    probabilities = np.clip(probabilities, 1e-12, 1 - 1e-12)
     loss = -targets * np.log(probabilities) - (1 - targets) * np.log(
         1 - probabilities
     )
@@ -102,25 +101,21 @@ def search_lambda(
             if initial_weights_state is not None:
                 np.random.set_state(initial_weights_state)
 
-            theta1_valid, theta2_valid, _, _ = train_model(
+            thetas_valid, _, _ = train_model(
                 X_treino,
                 y_treino,
                 lambda_=lambda_valid,
                 **train_kwargs,
             )
-            models_by_lambda[lambda_valid] = (theta1_valid, theta2_valid)
+            models_by_lambda[lambda_valid] = thetas_valid
 
             training_costs.append(
-                classification_cost(
-                    X_treino, y_treino, theta1_valid, theta2_valid, num_labels
-                )
+                classification_cost(X_treino, y_treino, thetas_valid, num_labels)
             )
             validation_costs.append(
-                classification_cost(
-                    X_valid, y_valid, theta1_valid, theta2_valid, num_labels
-                )
+                classification_cost(X_valid, y_valid, thetas_valid, num_labels)
             )
-            pred_valid = predict_model(X_valid, theta1_valid, theta2_valid)
+            pred_valid = predict_model(X_valid, thetas_valid)
             acc = np.mean(pred_valid == y_valid.ravel()) * 100
             validation_accuracy.append(acc)
             print(
