@@ -57,7 +57,7 @@ def plot_error_cases(
         )
 
         for axis, index in zip(axes.flat, error_indices):
-            axis.imshow(X[index].reshape(image_shape), cmap="gray")
+            axis.imshow(X[index].reshape(image_shape).T, cmap="gray")
             axis.set_title(f"Verdadeiro: {y_true[index]}\nPredito: {y_pred[index]}")
             axis.axis("off")
 
@@ -89,10 +89,12 @@ def run_error_cases_visualization(
     output_path=None,
     show=True,
     random_state=42,
+    split_random_state=42,
 ):
     """Treina, avalia e gera a visualização dos erros do modelo."""
     X_treino, y_treino, X_valid, y_valid, X_teste, y_teste = get_data_partitioned(
-        file_path=file_path
+        file_path=file_path,
+        random_state=split_random_state,
     )
 
     if hidden_layer_sizes is None:

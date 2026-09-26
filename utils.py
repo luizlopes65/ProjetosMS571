@@ -30,9 +30,7 @@ def sigmoidGradient(z):
 
 
 def unpack_thetas(theta, layer_sizes):
-    """Desempacota o vetor 1D ``theta`` em uma lista de matrizes de peso,
-    uma por transição entre camadas consecutivas de ``layer_sizes``
-    (layer_sizes[0] = entrada, layer_sizes[-1] = número de classes)."""
+
     layer_sizes = validate_layer_sizes(layer_sizes)
     theta = np.asarray(theta, dtype=float).ravel()
     expected_size = sum(
@@ -55,7 +53,6 @@ def unpack_thetas(theta, layer_sizes):
 
 
 def pack_thetas(thetas):
-    """Empacota a lista de matrizes de peso de volta em um único vetor 1D."""
     return np.concatenate([t.ravel() for t in thetas])
 
 
@@ -66,14 +63,14 @@ def randInitializeWeights(L_in, L_out):
 
 
 def randInitializeAllWeights(layer_sizes):
-    """Inicializa aleatoriamente a lista completa de pesos, uma matriz por
-    transição entre camadas consecutivas de ``layer_sizes``."""
+
     layer_sizes = validate_layer_sizes(layer_sizes)
     return [randInitializeWeights(l_in, l_out)
             for l_in, l_out in zip(layer_sizes[:-1], layer_sizes[1:])]
 
 
 def computeCost(X, y, theta, layer_sizes, num_labels, Lambda):
+
     layer_sizes = validate_layer_sizes(layer_sizes)
     if num_labels != layer_sizes[-1]:
         raise ValueError("num_labels deve ser igual ao tamanho da camada de saída.")
@@ -81,9 +78,11 @@ def computeCost(X, y, theta, layer_sizes, num_labels, Lambda):
     L = len(thetas)
 
     m = X.shape[0]
-    J = 0
-    X = np.hstack((np.ones((m,1)),X))
-    y10 = np.zeros((m, num_labels))
+    X = np.hstack((np.ones((m, 1)), X))
+    y10 = (
+        np.asarray(y).ravel()[:, np.newaxis]
+        == np.arange(1, num_labels + 1)
+    ).astype(float)
 
     # Passada para frente (generalizada para N camadas)
     a = [X]                                    # a[0] = entrada com bias
@@ -94,28 +93,22 @@ def computeCost(X, y, theta, layer_sizes, num_labels, Lambda):
         a.append(a_next)
     a2 = a[-1]                                 # saída (sem bias)
 
-    for i in range(1, num_labels+1):
-        y10[:,i-1][:,np.newaxis] = np.where(y==i,1,0)
-    for j in range(num_labels):
-        J = J + sum(-y10[:,j]*np.log(a2[:,j])-(1-y10[:,j])*np.log(1-a2[:,j]))
-
-    cost = 1/m*J
+    probabilities = np.clip(a2, 1e-12, 1 - 1e-12)
+    cost = -np.sum(
+        y10 * np.log(probabilities) + (1 - y10) * np.log(1 - probabilities)
+    ) / m
     reg_J = cost + Lambda/(2*m)*sum(np.sum(theta_l[:,1:]**2) for theta_l in thetas)
 
-    # Backpropagation (por amostra, generalizado para N camadas)
-    grad = [np.zeros((theta_l.shape)) for theta_l in thetas]
-    for i in range(m):
-        xi = X[i,:]
-        a_i = [a_k[i,:] for a_k in a]          # ativações desta amostra
-        d = [None]*L
-        d[L-1] = a_i[-1] - y10[i,:]            # d2 = a2i - y10[i,:]
-        for l in range(L-2, -1, -1):
-            d[l] = thetas[l+1].T @ d[l+1] * sigmoidGradient(np.hstack((1, a_i[l] @ thetas[l].T)))
-            d[l] = d[l][1:]                    # descarta o bias, como d1[1:] no original
-        for l in range(L):
-            grad[l] = grad[l] + d[l][:,np.newaxis] @ a_i[l][:,np.newaxis].T
+    # Backpropagation vetorizada. deltas[l] tem forma (m, layer_sizes[l + 1]).
+    deltas = [None] * L
+    deltas[-1] = a[-1] - y10
+    for l in range(L - 2, -1, -1):
+        hidden_activations = a[l + 1][:, 1:]
+        deltas[l] = (
+            deltas[l + 1] @ thetas[l + 1][:, 1:]
+        ) * hidden_activations * (1 - hidden_activations)
 
-    grad = [g/m for g in grad]
+    grad = [delta.T @ activation / m for delta, activation in zip(deltas, a)]
     grad_reg = [g + (Lambda/m)*np.hstack((np.zeros((theta_l.shape[0],1)), theta_l[:,1:]))
                 for g, theta_l in zip(grad, thetas)]
 
