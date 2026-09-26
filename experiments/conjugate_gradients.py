@@ -123,6 +123,39 @@ def compare_optimizers(
     return results
 
 
+def export_comparison_table(results, csv_path, markdown_path):
+    """Salva a comparação dos otimizadores em CSV e Markdown."""
+    import csv
+
+    csv_path = Path(csv_path)
+    markdown_path = Path(markdown_path)
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    markdown_path.parent.mkdir(parents=True, exist_ok=True)
+
+    fieldnames = [
+        "iterations",
+        "lambda",
+        "gradient_descent_accuracy",
+        "conjugate_gradient_accuracy",
+    ]
+    with csv_path.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(results)
+
+    lines = [
+        "| Iterações | Lambda | Gradient descent (%) | Conjugate gradient (%) |",
+        "| ---: | ---: | ---: | ---: |",
+    ]
+    lines.extend(
+        f"| {row['iterations']} | {row['lambda']:.3g} | "
+        f"{row['gradient_descent_accuracy']:.2f} | "
+        f"{row['conjugate_gradient_accuracy']:.2f} |"
+        for row in results
+    )
+    markdown_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def print_comparison_table(results):
     print("\nComparison on test set")
     print(f"{'iterations':>10} {'lambda':>10} {'gradient descent (%)':>22} {'conjugate gradient (%)':>24}")
