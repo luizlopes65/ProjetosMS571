@@ -71,8 +71,8 @@ def model_accuracy(X, y, thetas):
 def compare_optimizers(
     X_treino,
     y_treino,
-    X_teste,
-    y_teste,
+    X_valid,
+    y_valid,
     iterations_list=ITERATIONS_LIST,
     lambda_list=LAMBDA_LIST,
     random_state=42,
@@ -80,7 +80,7 @@ def compare_optimizers(
     hidden_layer_sizes=None,
     num_labels=10,
 ):
-    """Compara gradiente descendente e CG nas mesmas configurações."""
+    """Compara GD e CG no grid de hiperparâmetros usando só validação."""
     X_treino = np.asarray(X_treino)
     y_treino = np.asarray(y_treino).reshape(-1, 1)
     results = []
@@ -97,7 +97,7 @@ def compare_optimizers(
                 iterations=iterations,
                 lambda_=lambda_,
             )
-            accuracy_gd = model_accuracy(X_teste, y_teste, thetas_gd)
+            validation_accuracy_gd = model_accuracy(X_valid, y_valid, thetas_gd)
 
             np.random.seed(random_state)
             thetas_cg, _, _ = train_model_cg(
@@ -109,18 +109,81 @@ def compare_optimizers(
                 iterations=iterations,
                 lambda_=lambda_,
             )
-            accuracy_cg = model_accuracy(X_teste, y_teste, thetas_cg)
+            validation_accuracy_cg = model_accuracy(X_valid, y_valid, thetas_cg)
 
             results.append(
                 {
                     "iterations": iterations,
                     "lambda": lambda_,
-                    "gradient_descent_accuracy": accuracy_gd,
-                    "conjugate_gradient_accuracy": accuracy_cg,
+                    "gradient_descent_validation_accuracy": validation_accuracy_gd,
+                    "conjugate_gradient_validation_accuracy": validation_accuracy_cg,
                 }
             )
 
     return results
+
+
+def select_optimizer_configs(results):
+    """Escolhe uma configuração por otimizador exclusivamente pela validação."""
+    return {
+        "gradient_descent": max(
+            results, key=lambda row: row["gradient_descent_validation_accuracy"]
+        ),
+        "conjugate_gradient": max(
+            results, key=lambda row: row["conjugate_gradient_validation_accuracy"]
+        ),
+    }
+
+
+def evaluate_selected_optimizer_configs(
+    X_treino,
+    y_treino,
+    X_teste,
+    y_teste,
+    selected_configs,
+    random_state=42,
+    input_layer_size=400,
+    hidden_layer_sizes=None,
+    num_labels=10,
+):
+    """Retreina os dois modelos selecionados e consulta o teste uma vez cada."""
+    evaluations = {}
+    gd_config = selected_configs["gradient_descent"]
+    np.random.seed(random_state)
+    gd_thetas, _, _ = train_model(
+        X_treino,
+        y_treino,
+        input_layer_size=input_layer_size,
+        hidden_layer_sizes=hidden_layer_sizes,
+        num_labels=num_labels,
+        iterations=gd_config["iterations"],
+        lambda_=gd_config["lambda"],
+    )
+    evaluations["gradient_descent"] = {
+        "iterations": gd_config["iterations"],
+        "lambda": gd_config["lambda"],
+        "validation_accuracy": gd_config["gradient_descent_validation_accuracy"],
+        "test_accuracy": model_accuracy(X_teste, y_teste, gd_thetas),
+    }
+
+    cg_config = selected_configs["conjugate_gradient"]
+    np.random.seed(random_state)
+    cg_thetas, _, _ = train_model_cg(
+        X_treino,
+        y_treino,
+        input_layer_size=input_layer_size,
+        hidden_layer_sizes=hidden_layer_sizes,
+        num_labels=num_labels,
+        iterations=cg_config["iterations"],
+        lambda_=cg_config["lambda"],
+    )
+    evaluations["conjugate_gradient"] = {
+        "iterations": cg_config["iterations"],
+        "lambda": cg_config["lambda"],
+        "validation_accuracy": cg_config["conjugate_gradient_validation_accuracy"],
+        "test_accuracy": model_accuracy(X_teste, y_teste, cg_thetas),
+    }
+    return evaluations
 
 
 def export_comparison_table(results, csv_path, markdown_path):
@@ -135,56 +198,64 @@ def export_comparison_table(results, csv_path, markdown_path):
     fieldnames = [
         "iterations",
         "lambda",
-        "gradient_descent_accuracy",
-        "conjugate_gradient_accuracy",
+        "gradient_descent_validation_accuracy",
+        "conjugate_gradient_validation_accuracy",
     ]
     with csv_path.open("w", newline="", encoding="utf-8") as file:
-        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer = csv.DictWriter(file, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         writer.writerows(results)
 
     lines = [
-        "| Iterações | Lambda | Gradient descent (%) | Conjugate gradient (%) |",
+        "| Iterações | Lambda | GD validação (%) | CG validação (%) |",
         "| ---: | ---: | ---: | ---: |",
     ]
     lines.extend(
-        f"| {row['iterations']} | {row['lambda']:.3g} | "
-        f"{row['gradient_descent_accuracy']:.2f} | "
-        f"{row['conjugate_gradient_accuracy']:.2f} |"
+            f"| {row['iterations']} | {row['lambda']:.3g} | "
+            f"{row['gradient_descent_validation_accuracy']:.2f} | "
+            f"{row['conjugate_gradient_validation_accuracy']:.2f} |"
         for row in results
     )
     markdown_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def print_comparison_table(results):
-    print("\nComparison on test set")
-    print(f"{'iterations':>10} {'lambda':>10} {'gradient descent (%)':>22} {'conjugate gradient (%)':>24}")
+def print_comparison_table(results, selected_evaluations=None):
+    print("\nComparison selected by validation")
+    print(f"{'iterations':>10} {'lambda':>10} {'GD val. (%)':>12} {'CG val. (%)':>12}")
     for row in results:
         print(
             f"{row['iterations']:>10} {row['lambda']:>10.3g} "
-            f"{row['gradient_descent_accuracy']:>22.2f} "
-            f"{row['conjugate_gradient_accuracy']:>24.2f}"
+            f"{row['gradient_descent_validation_accuracy']:>12.2f} "
+            f"{row['conjugate_gradient_validation_accuracy']:>12.2f}"
         )
 
-    best_gd = max(results, key=lambda row: row["gradient_descent_accuracy"])
-    best_cg = max(results, key=lambda row: row["conjugate_gradient_accuracy"])
+    selected = select_optimizer_configs(results)
+    best_gd = selected["gradient_descent"]
+    best_cg = selected["conjugate_gradient"]
     print(
-        f"\nBest GD: {best_gd['gradient_descent_accuracy']:.2f}% "
+        f"\nBest GD: validation {best_gd['gradient_descent_validation_accuracy']:.2f}% "
         f"(iterations={best_gd['iterations']}, lambda={best_gd['lambda']})"
     )
     print(
-        f"Best CG: {best_cg['conjugate_gradient_accuracy']:.2f}% "
+        f"Best CG: validation {best_cg['conjugate_gradient_validation_accuracy']:.2f}% "
         f"(iterations={best_cg['iterations']}, lambda={best_cg['lambda']})"
     )
+    if selected_evaluations is not None:
+        for name, evaluation in selected_evaluations.items():
+            print(f"{name}: test {evaluation['test_accuracy']:.2f}%")
 
 
 if __name__ == "__main__":
-    X_treino, y_treino, _, _, X_teste, y_teste = get_data_partitioned()
+    X_treino, y_treino, X_valid, y_valid, X_teste, y_teste = get_data_partitioned()
 
     comparison = compare_optimizers(
         X_treino,
         y_treino,
-        X_teste,
-        y_teste,
+        X_valid,
+        y_valid,
     )
-    print_comparison_table(comparison)
+    selected = select_optimizer_configs(comparison)
+    evaluation = evaluate_selected_optimizer_configs(
+        X_treino, y_treino, X_teste, y_teste, selected
+    )
+    print_comparison_table(comparison, evaluation)

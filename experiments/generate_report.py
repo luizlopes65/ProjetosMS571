@@ -25,7 +25,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from experiments.conjugate_gradients import compare_optimizers, export_comparison_table
+from experiments.conjugate_gradients import (
+    compare_optimizers,
+    evaluate_selected_optimizer_configs,
+    export_comparison_table,
+    select_optimizer_configs,
+)
+from experiments.cosine_similarity_cases import run_cosine_similarity_experiment
 from experiments.error_cases_viz import run_error_cases_visualization
 from experiments.gradient_check import gradient_check
 from experiments.lambda_search import LAMBDA_LIST, plot_validation_error, search_lambda
@@ -106,9 +112,20 @@ def _write_gradient_checks(checks, output_path):
     )
 
 
-def _write_report(report_path, config, checks, lambda_result, learning_result, optimizer_results, test_accuracy):
-    best_gd = max(optimizer_results, key=lambda row: row["gradient_descent_accuracy"])
-    best_cg = max(optimizer_results, key=lambda row: row["conjugate_gradient_accuracy"])
+def _write_report(
+    report_path,
+    config,
+    checks,
+    lambda_result,
+    learning_result,
+    cosine_result,
+    optimizer_results,
+    optimizer_evaluations,
+    test_accuracy,
+):
+    best_gd = optimizer_evaluations["gradient_descent"]
+    best_cg = optimizer_evaluations["conjugate_gradient"]
+    most_similar_pair = cosine_result.iloc[0]
     lines = [
         "# Relatório de experimentos",
         "",
@@ -118,6 +135,7 @@ def _write_report(report_path, config, checks, lambda_result, learning_result, o
         f"- Seed: `{config['seed']}`",
         f"- Arquitetura: `[{config['input_size']}, {', '.join(map(str, config['hidden_layer_sizes']))}, {config['num_labels']}]`",
         f"- Iterações principais: `{config['iterations']}`",
+        f"- Partições: treino `{config['train_size']}`, validação `{config['validation_size']}`, teste `{config['test_size']}`",
         "",
         "## Gradient check",
         "",
@@ -143,11 +161,21 @@ def _write_report(report_path, config, checks, lambda_result, learning_result, o
             f"- Menor erro de treino: `{learning_result['train_errors'].min():.2f}%`",
             f"- Menor erro de validação: `{learning_result['validation_errors'].min():.2f}%`",
             "",
+            "## Similaridade de cosseno entre classes",
+            "",
+            "- Pares comparados como vetores de pixels achatados; a figura os reconstrói em 20×20.",
+            f"- Maior similaridade interclasse: `{most_similar_pair['similaridade_cosseno']:.4f}` "
+            f"(classe {int(most_similar_pair['classe_a'])} × classe {int(most_similar_pair['classe_b'])}).",
+            "- Este é um experimento descritivo dos dados; não treina uma CNN.",
+            "",
             "## Comparação entre otimizadores",
             "",
-            f"- Melhor gradient descent: `{best_gd['gradient_descent_accuracy']:.2f}%` "
+            "- O grid abaixo usa apenas validação; o teste foi consultado uma vez para cada configuração selecionada.",
+            f"- Melhor gradient descent: validação `{best_gd['validation_accuracy']:.2f}%`, "
+            f"teste `{best_gd['test_accuracy']:.2f}%` "
             f"(iterações={best_gd['iterations']}, lambda={best_gd['lambda']})",
-            f"- Melhor conjugate gradient: `{best_cg['conjugate_gradient_accuracy']:.2f}%` "
+            f"- Melhor conjugate gradient: validação `{best_cg['validation_accuracy']:.2f}%`, "
+            f"teste `{best_cg['test_accuracy']:.2f}%` "
             f"(iterações={best_cg['iterations']}, lambda={best_cg['lambda']})",
             "",
             "## Arquivos gerados",
@@ -158,6 +186,7 @@ def _write_report(report_path, config, checks, lambda_result, learning_result, o
             "- [Erro de validação por lambda](figures/validation_error_vs_lambda.png)",
             "- [Curva de aprendizado](figures/learning_curve.png)",
             "- [Custo por tamanho de treino](figures/learning_curve_by_train_size.png)",
+            "- [Pares interclasse por similaridade de cosseno](figures/cosine_cross_class_pairs.png)",
             "- [Evolução dos pesos](figures/activation_evolution.gif)",
             "- [Casos classificados incorretamente](figures/error_cases.png)",
             "",
@@ -166,6 +195,7 @@ def _write_report(report_path, config, checks, lambda_result, learning_result, o
             "- [Comparação dos otimizadores em CSV](tables/optimizer_comparison.csv)",
             "- [Comparação dos otimizadores em Markdown](tables/optimizer_comparison.md)",
             "- [Resultados do gradient check](tables/gradient_check.md)",
+            "- [Pares interclasse por cosseno](tables/cosine_cross_class_pairs.csv)",
         ]
     )
     report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -248,6 +278,14 @@ def generate_report(
         show=False,
     )
 
+    cosine_result = run_cosine_similarity_experiment(
+        data_path=data_path,
+        top_k=10,
+        figure_path=figures_dir / "cosine_cross_class_pairs.png",
+        table_path=tables_dir / "cosine_cross_class_pairs.csv",
+        show=False,
+    )
+
     with preserve_random_state():
         np.random.seed(seed)
         thetas, _, _, snapshots = train_model(
@@ -276,16 +314,29 @@ def generate_report(
             output_path=figures_dir / "error_cases.png",
             show=False,
             random_state=seed,
+            split_random_state=seed,
         )
 
     with preserve_random_state():
         optimizer_results = compare_optimizers(
             X_train,
             y_train,
-            X_test,
-            y_test,
+            X_valid,
+            y_valid,
             iterations_list=optimizer_iterations,
             lambda_list=LAMBDA_LIST,
+            random_state=seed,
+            input_layer_size=input_size,
+            hidden_layer_sizes=hidden_layer_sizes,
+            num_labels=num_labels,
+        )
+        optimizer_selected_configs = select_optimizer_configs(optimizer_results)
+        optimizer_evaluations = evaluate_selected_optimizer_configs(
+            X_train,
+            y_train,
+            X_test,
+            y_test,
+            optimizer_selected_configs,
             random_state=seed,
             input_layer_size=input_size,
             hidden_layer_sizes=hidden_layer_sizes,
@@ -304,6 +355,9 @@ def generate_report(
         "hidden_layer_sizes": hidden_layer_sizes,
         "num_labels": num_labels,
         "iterations": iterations,
+        "train_size": len(X_train),
+        "validation_size": len(X_valid),
+        "test_size": len(X_test),
     }
     _write_report(
         output_dir / "REPORT.md",
@@ -314,7 +368,9 @@ def generate_report(
             "validation_accuracy": validation_accuracy[np.argmax(validation_accuracy)],
         },
         learning_result,
+        cosine_result,
         optimizer_results,
+        optimizer_evaluations,
         test_accuracy,
     )
     plt.close("all")

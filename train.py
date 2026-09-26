@@ -20,18 +20,33 @@ def get_data_partitioned(
     pct_teste=0.2,
     random_state=42,
 ):
+    """Embaralha e separa os dados em treino, validação e teste.
+
+    ``pct_valid`` e ``pct_teste`` são frações do conjunto total; o restante é
+    destinado ao treino.
+    """
+    if not 0 <= pct_valid < 1 or not 0 < pct_teste < 1:
+        raise ValueError("pct_valid e pct_teste devem ser frações entre 0 e 1.")
+    if pct_valid + pct_teste >= 1:
+        raise ValueError("pct_valid + pct_teste deve ser menor que 1.")
+
     data = pd.read_csv(file_path, header=None)
     data = data.sample(frac=1, random_state=random_state).reset_index(drop=True)
     X = data.drop(columns=data.columns[-1])
     y = data.drop(columns=data.columns[:-1])
 
     N_TOTAL = X.shape[0]
-    NUM_TREINO = int((1 - pct_teste) * N_TOTAL)
     NUM_VALID = int(pct_valid * N_TOTAL)
+    NUM_TESTE = int(pct_teste * N_TOTAL)
+    NUM_TREINO = N_TOTAL - NUM_VALID - NUM_TESTE
+
+    if min(NUM_TREINO, NUM_VALID, NUM_TESTE) < 1:
+        raise ValueError("Cada partição precisa conter pelo menos um exemplo.")
 
     X_treino, y_treino = X.iloc[:NUM_TREINO], y.iloc[:NUM_TREINO]
-    X_valid, y_valid = X.iloc[N_TOTAL - NUM_VALID:], y.iloc[N_TOTAL - NUM_VALID:]
-    X_teste, y_teste = X.iloc[NUM_TREINO:N_TOTAL - NUM_VALID], y.iloc[NUM_TREINO:N_TOTAL - NUM_VALID]
+    valid_end = NUM_TREINO + NUM_VALID
+    X_valid, y_valid = X.iloc[NUM_TREINO:valid_end], y.iloc[NUM_TREINO:valid_end]
+    X_teste, y_teste = X.iloc[valid_end:], y.iloc[valid_end:]
 
     return X_treino, y_treino, X_valid, y_valid, X_teste, y_teste
 
