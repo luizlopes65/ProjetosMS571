@@ -29,6 +29,8 @@ def plot_error_cases(
     image_shape=None,
     max_images=25,
     title="Casos classificados incorretamente",
+    output_path=None,
+    show=True,
 ):
     """Mostra até ``max_images`` erros com rótulo verdadeiro e predito."""
     X = np.asarray(X)
@@ -44,27 +46,36 @@ def plot_error_cases(
         ax.text(0.5, 0.5, "Nenhum erro encontrado", ha="center", va="center")
         ax.axis("off")
         ax.set_title(title)
-        return fig
+    else:
+        num_columns = min(5, len(error_indices))
+        num_rows = math.ceil(len(error_indices) / num_columns)
+        fig, axes = plt.subplots(
+            num_rows,
+            num_columns,
+            figsize=(2.2 * num_columns, 2.5 * num_rows),
+            squeeze=False,
+        )
 
-    num_columns = min(5, len(error_indices))
-    num_rows = math.ceil(len(error_indices) / num_columns)
-    fig, axes = plt.subplots(
-        num_rows,
-        num_columns,
-        figsize=(2.2 * num_columns, 2.5 * num_rows),
-        squeeze=False,
-    )
+        for axis, index in zip(axes.flat, error_indices):
+            axis.imshow(X[index].reshape(image_shape), cmap="gray")
+            axis.set_title(f"Verdadeiro: {y_true[index]}\nPredito: {y_pred[index]}")
+            axis.axis("off")
 
-    for axis, index in zip(axes.flat, error_indices):
-        axis.imshow(X[index].reshape(image_shape), cmap="gray")
-        axis.set_title(f"Verdadeiro: {y_true[index]}\nPredito: {y_pred[index]}")
-        axis.axis("off")
+        for axis in axes.flat[len(error_indices):]:
+            axis.axis("off")
 
-    for axis in axes.flat[len(error_indices):]:
-        axis.axis("off")
+        fig.suptitle(title, y=0.995)
+        fig.tight_layout(rect=(0, 0, 1, 0.96), h_pad=2.0)
 
-    fig.suptitle(title, y=0.995)
-    fig.tight_layout(rect=(0, 0, 1, 0.96), h_pad=2.0)
+    if output_path is not None:
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_path, dpi=150)
+        print(f"Figura salva em: {output_path}")
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
     return fig
 
 
@@ -75,7 +86,11 @@ def run_error_cases_visualization(
     iterations=800,
     max_images=25,
     image_shape=None,
+    output_path=None,
+    show=True,
+    random_state=42,
 ):
+    """Treina, avalia e gera a visualização dos erros do modelo."""
     X_treino, y_treino, X_valid, y_valid, X_teste, y_teste = get_data_partitioned(
         file_path=file_path
     )
@@ -99,6 +114,7 @@ def run_error_cases_visualization(
         X_valid,
         y_valid,
         lambda_list=lambda_list,
+        random_state=random_state,
         input_layer_size=input_layer_size,
         hidden_layer_sizes=hidden_layer_sizes,
         num_labels=num_labels,
@@ -122,8 +138,9 @@ def run_error_cases_visualization(
         image_shape=image_shape,
         max_images=max_images,
         title=f"Erros | lambda={best_lambda} | acurácia={accuracy:.2f}%",
+        output_path=output_path,
+        show=show,
     )
-    plt.show()
 
     return accuracy, best_lambda, y_true, y_pred
 
