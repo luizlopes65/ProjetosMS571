@@ -109,8 +109,9 @@ def prediction(X, theta):
     X = np.hstack((np.ones((m,1)),X))
 
     a = X
-    for theta_l in theta:
+    for layer_index, theta_l in enumerate(theta):
         a = sigmoid(a @ theta_l.T)
-        a = np.hstack((np.ones((m,1)),a))
+        if layer_index < len(theta) - 1:
+            a = np.hstack((np.ones((m,1)),a))
 
-    return np.argmax(a[:,1:],axis=1)+1
+    return np.argmax(a,axis=1)+1

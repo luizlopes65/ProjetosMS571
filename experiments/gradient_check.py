@@ -85,10 +85,14 @@ def gradient_check(
 
 
 def run_default_checks():
-    ok_1 = gradient_check([3, 5, 3])        # 1 camada escondida (PDF)
-    ok_2 = gradient_check([3, 5, 4, 3])     # 2 camadas escondidas
-    print("\nRESULTADO:", "TODOS OS TESTES PASSARAM" if (ok_1 and ok_2) else "HA FALHAS")
-    return ok_1 and ok_2
+    checks = [
+        gradient_check([3, 3]),       # sem camada escondida
+        gradient_check([3, 5, 3]),    # 1 camada escondida
+        gradient_check([3, 5, 4, 3]), # 2 camadas escondidas
+    ]
+    passed = all(checks)
+    print("\nRESULTADO:", "TODOS OS TESTES PASSARAM" if passed else "HA FALHAS")
+    return passed
 
 
 if __name__ == "__main__":

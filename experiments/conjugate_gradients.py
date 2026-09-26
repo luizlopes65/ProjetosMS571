@@ -20,12 +20,14 @@ def train_model_cg(
     X_treino,
     y_treino,
     input_layer_size=400,
-    hidden_layer_sizes=[25],
+    hidden_layer_sizes=None,
     num_labels=10,
     iterations=400,
     lambda_=1,
     initial_theta=None,
 ):
+    if hidden_layer_sizes is None:
+        hidden_layer_sizes = [25]
     layer_sizes = [input_layer_size, *hidden_layer_sizes, num_labels]
     X_treino = np.asarray(X_treino)
     y_treino = np.asarray(y_treino).reshape(-1, 1)
@@ -75,7 +77,7 @@ def compare_optimizers(
     lambda_list=LAMBDA_LIST,
     random_state=42,
     input_layer_size=400,
-    hidden_layer_sizes=[25],
+    hidden_layer_sizes=None,
     num_labels=10,
 ):
     """Compara gradiente descendente e CG nas mesmas configurações."""
