@@ -71,7 +71,7 @@ def plot_error_cases(
 def run_error_cases_visualization(
     file_path=PROCESSED_DATA_PATH,
     lambda_list=LAMBDA_LIST,
-    hidden_layer_sizes=[25],
+    hidden_layer_sizes=None,
     iterations=800,
     max_images=25,
     image_shape=None,
@@ -79,6 +79,9 @@ def run_error_cases_visualization(
     X_treino, y_treino, X_valid, y_valid, X_teste, y_teste = get_data_partitioned(
         file_path=file_path
     )
+
+    if hidden_layer_sizes is None:
+        hidden_layer_sizes = [25]
 
     labels = np.concatenate(
         [

@@ -46,13 +46,15 @@ def train_model(
     X_treino,
     y_treino,
     input_layer_size=400,
-    hidden_layer_sizes=[25],
+    hidden_layer_sizes=None,
     num_labels=10,
     learning_rate=0.8,
     iterations=800,
     lambda_=1,
     snapshot_every=None,
 ):
+    if hidden_layer_sizes is None:
+        hidden_layer_sizes = [25]
     layer_sizes = [input_layer_size, *hidden_layer_sizes, num_labels]
     initial_thetas = randInitializeAllWeights(layer_sizes)
     initial_theta = pack_thetas(initial_thetas)

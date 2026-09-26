@@ -4,6 +4,7 @@ import sys
 
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, PillowWriter
+import numpy as np
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -33,51 +34,104 @@ def create_activation_grid(num_neurons):
     return fig, list(axes.flat)
 
 
-def plot_activation_images(theta1):
-    num_neurons = theta1.shape[0]
+def _get_layer(thetas, layer_index):
+    if not thetas:
+        raise ValueError("thetas deve conter pelo menos uma matriz de pesos.")
+    if not 0 <= layer_index < len(thetas):
+        raise ValueError(
+            f"layer_index deve estar entre 0 e {len(thetas) - 1}; "
+            f"recebido: {layer_index}."
+        )
+    return np.asarray(thetas[layer_index], dtype=float)
+
+
+def _plot_weight(weights, input_shape=None):
+    weights = np.asarray(weights, dtype=float)
+    if input_shape is not None and np.prod(input_shape) == weights.size:
+        return normalize(weights.reshape(input_shape)), "image"
+    return normalize(weights[np.newaxis, :]), "weights"
+
+
+def plot_activation_images(
+    thetas,
+    layer_index=0,
+    input_shape=None,
+    output_path=None,
+    show=True,
+):
+    """Visualiza os pesos de qualquer transição da rede.
+
+    A primeira camada pode ser mostrada como imagem quando ``input_shape``
+    corresponde ao número de entradas. Para outras arquiteturas, cada vetor
+    de pesos é mostrado como um mapa de calor genérico.
+    """
+    theta = _get_layer(thetas, layer_index)
+    num_neurons = theta.shape[0]
     fig, axes = create_activation_grid(num_neurons)
 
-    for neuron in range(num_neurons):
-        ax = axes[neuron]
-        image = theta1[neuron, 1:].reshape(20, 20)
-        ax.imshow(normalize(image), cmap="gray", vmin=0, vmax=1)
-        ax.set_title(f"Neurônio {neuron + 1}")
-        ax.axis("off")
+    for neuron, axis in enumerate(axes[:num_neurons]):
+        image, image_type = _plot_weight(theta[neuron, 1:], input_shape)
+        axis.imshow(image, cmap="gray" if image_type == "image" else "coolwarm", aspect="auto")
+        axis.set_title(f"Neurônio {neuron + 1}")
+        axis.axis("off")
 
-    for ax in axes[num_neurons:]:
-        ax.axis("off")
+    for axis in axes[num_neurons:]:
+        axis.axis("off")
 
-    fig.suptitle("Pesos finais dos neurônios escondidos")
-    plt.tight_layout()
-    plt.show()
+    fig.suptitle(f"Pesos da transição {layer_index + 1}")
+    fig.tight_layout()
+
+    if output_path is not None:
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_path, dpi=150)
+        print(f"Figura salva em: {output_path}")
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
+    return fig
 
 
 def create_activation_gif(
-    snapshots, output_path=VISUALIZATIONS_DIR / "activation_evolution.gif"
+    snapshots,
+    output_path=VISUALIZATIONS_DIR / "activation_evolution.gif",
+    layer_index=0,
+    input_shape=None,
 ):
+    """Gera um GIF com a evolução dos pesos de uma transição escolhida."""
+    if not snapshots:
+        raise ValueError("snapshots deve conter pelo menos um estado da rede.")
+
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    num_neurons = snapshots[0][1][0].shape[0]  # snapshots[0][1] é a lista de thetas; [0] = 1ª camada
+    first_thetas = snapshots[0][1]
+    first_theta = _get_layer(first_thetas, layer_index)
+    num_neurons = first_theta.shape[0]
     fig, axes = create_activation_grid(num_neurons)
     images = []
 
-    for neuron in range(num_neurons):
-        ax = axes[neuron]
-        image = snapshots[0][1][0][neuron, 1:].reshape(20, 20)
-        images.append(ax.imshow(normalize(image), cmap="gray", vmin=0, vmax=1))
-        ax.set_title(f"Neurônio {neuron + 1}")
-        ax.axis("off")
+    for neuron, axis in enumerate(axes[:num_neurons]):
+        image, image_type = _plot_weight(first_theta[neuron, 1:], input_shape)
+        images.append(
+            axis.imshow(
+                image,
+                cmap="gray" if image_type == "image" else "coolwarm",
+                aspect="auto",
+            )
+        )
+        axis.set_title(f"Neurônio {neuron + 1}")
+        axis.axis("off")
 
-    for ax in axes[num_neurons:]:
-        ax.axis("off")
+    for axis in axes[num_neurons:]:
+        axis.axis("off")
 
     def update(frame):
         iteration, thetas_snapshot = snapshots[frame]
-
+        theta = _get_layer(thetas_snapshot, layer_index)
         for neuron, image_plot in enumerate(images):
-            image = thetas_snapshot[0][neuron, 1:].reshape(20, 20)
-            image_plot.set_data(normalize(image))
-
+            image, _ = _plot_weight(theta[neuron, 1:], input_shape)
+            image_plot.set_data(image)
         fig.suptitle(f"Evolução dos pesos — iteração {iteration}")
         return images
 
@@ -90,6 +144,7 @@ def create_activation_gif(
     )
     animation.save(output_path, writer=PillowWriter(fps=10))
     plt.close(fig)
+    print(f"GIF salvo em: {output_path}")
 
 
 if __name__ == "__main__":
@@ -99,6 +154,5 @@ if __name__ == "__main__":
         y_treino,
         snapshot_every=10,
     )
-    plot_activation_images(thetas[0])  # primeira camada: entrada -> 1ª escondida (20x20)
-    create_activation_gif(snapshots)
-    print("GIF salvo em activation_evolution.gif")
+    plot_activation_images(thetas, input_shape=(20, 20))
+    create_activation_gif(snapshots, input_shape=(20, 20))

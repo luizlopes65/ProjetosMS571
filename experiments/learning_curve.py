@@ -123,7 +123,7 @@ def run_learning_curve(
     min_train_size: int = DEFAULT_MIN_TRAIN_SIZE,
     num_points: int = DEFAULT_NUM_POINTS,
     random_state: int = 42,
-    hidden_layer_sizes: list[int] = [25],
+    hidden_layer_sizes: list[int] | None = None,
     iterations: int = 800,
     learning_rate: float = 0.8,
     lambda_: float = 1.0,
@@ -131,6 +131,9 @@ def run_learning_curve(
     partition_curves_output_path: str | Path | None = None,
     show: bool = True,
 ) -> dict[str, np.ndarray | int | list[np.ndarray]]:
+
+    if hidden_layer_sizes is None:
+        hidden_layer_sizes = [25]
 
     X_pool, y_pool, X_valid, y_valid = split_train_and_validation(
         file_path=file_path,
@@ -244,7 +247,7 @@ def run_learning_curve_with_best_lambda(
     min_train_size: int = DEFAULT_MIN_TRAIN_SIZE,
     num_points: int = DEFAULT_NUM_POINTS,
     random_state: int = 42,
-    hidden_layer_sizes: list[int] = [25],
+    hidden_layer_sizes: list[int] | None = None,
     iterations: int = 800,
     learning_rate: float = 0.8,
     output_path: str | Path | None = None,

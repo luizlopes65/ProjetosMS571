@@ -22,11 +22,12 @@ def classification_cost(X, y, thetas, num_labels):
     m = X.shape[0]
 
     activations = np.hstack((np.ones((m, 1)), X))
-    for theta in thetas:
+    for layer_index, theta in enumerate(thetas):
         activations = 1 / (1 + np.exp(-(activations @ theta.T)))
-        activations = np.hstack((np.ones((m, 1)), activations))
+        if layer_index < len(thetas) - 1:
+            activations = np.hstack((np.ones((m, 1)), activations))
 
-    probabilities = np.clip(activations[:, 1:], 1e-12, 1 - 1e-12)
+    probabilities = np.clip(activations, 1e-12, 1 - 1e-12)
     targets = (y[:, np.newaxis] == np.arange(1, num_labels + 1)).astype(float)
     loss = -targets * np.log(probabilities) - (1 - targets) * np.log(
         1 - probabilities
