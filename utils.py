@@ -1,6 +1,25 @@
 import numpy as np
 from tqdm import tqdm
 
+
+def validate_layer_sizes(layer_sizes):
+    """Valida a arquitetura e retorna seus tamanhos como uma tupla."""
+    if layer_sizes is None:
+        raise ValueError("layer_sizes não pode ser None.")
+
+    sizes = tuple(layer_sizes)
+    if len(sizes) < 2:
+        raise ValueError("layer_sizes deve conter entrada e saída.")
+    if any(
+        isinstance(size, bool)
+        or not isinstance(size, (int, np.integer))
+        or size <= 0
+        for size in sizes
+    ):
+        raise ValueError("Todos os tamanhos de camada devem ser inteiros positivos.")
+    return sizes
+
+
 def sigmoid(z):
     return 1/(1+np.exp(-z))
 
@@ -14,6 +33,18 @@ def unpack_thetas(theta, layer_sizes):
     """Desempacota o vetor 1D ``theta`` em uma lista de matrizes de peso,
     uma por transição entre camadas consecutivas de ``layer_sizes``
     (layer_sizes[0] = entrada, layer_sizes[-1] = número de classes)."""
+    layer_sizes = validate_layer_sizes(layer_sizes)
+    theta = np.asarray(theta, dtype=float).ravel()
+    expected_size = sum(
+        l_out * (l_in + 1)
+        for l_in, l_out in zip(layer_sizes[:-1], layer_sizes[1:])
+    )
+    if theta.size != expected_size:
+        raise ValueError(
+            f"theta possui {theta.size} valores, mas a arquitetura exige "
+            f"{expected_size}."
+        )
+
     thetas = []
     offset = 0
     for l_in, l_out in zip(layer_sizes[:-1], layer_sizes[1:]):
@@ -37,11 +68,15 @@ def randInitializeWeights(L_in, L_out):
 def randInitializeAllWeights(layer_sizes):
     """Inicializa aleatoriamente a lista completa de pesos, uma matriz por
     transição entre camadas consecutivas de ``layer_sizes``."""
+    layer_sizes = validate_layer_sizes(layer_sizes)
     return [randInitializeWeights(l_in, l_out)
             for l_in, l_out in zip(layer_sizes[:-1], layer_sizes[1:])]
 
 
 def computeCost(X, y, theta, layer_sizes, num_labels, Lambda):
+    layer_sizes = validate_layer_sizes(layer_sizes)
+    if num_labels != layer_sizes[-1]:
+        raise ValueError("num_labels deve ser igual ao tamanho da camada de saída.")
     thetas = unpack_thetas(theta, layer_sizes)
     L = len(thetas)
 
@@ -88,6 +123,7 @@ def computeCost(X, y, theta, layer_sizes, num_labels, Lambda):
 
 
 def gradientDescent(X, y, theta, alpha, nbr_iter, Lambda, layer_sizes, snapshot_callback=None):
+    layer_sizes = validate_layer_sizes(layer_sizes)
     thetas = unpack_thetas(theta, layer_sizes)
     J_history = []
 
