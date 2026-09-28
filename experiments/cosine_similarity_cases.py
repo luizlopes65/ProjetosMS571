@@ -26,6 +26,17 @@ if str(PROJECT_ROOT) not in sys.path:
 DEFAULT_DATA_PATH = PROJECT_ROOT / "processed_data.csv"
 DEFAULT_FIGURE_PATH = PROJECT_ROOT / "visualizations" / "cosine_cross_class_pairs.png"
 DEFAULT_TABLE_PATH = PROJECT_ROOT / "visualizations" / "cosine_cross_class_pairs.csv"
+PAIR_COLUMNS = (
+    "indice_a",
+    "classe_a",
+    "indice_b",
+    "classe_b",
+    "similaridade_cosseno",
+    "distancia_cosseno",
+)
+IEEE_TWO_COLUMN_WIDTH_IN = 7.16
+PAIRS_PER_ROW = 2
+PUBLISHED_PAIR_COUNT = 4
 
 
 def infer_image_shape(num_features: int) -> tuple[int, int]:
@@ -35,6 +46,15 @@ def infer_image_shape(num_features: int) -> tuple[int, int]:
             "O número de atributos precisa formar uma imagem quadrada para a visualização."
         )
     return side, side
+
+
+def format_class_label(value: object) -> str:
+    """Formata rótulos inteiros sem a casa decimal introduzida pela CSV."""
+    try:
+        numeric_value = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    return str(int(numeric_value)) if numeric_value.is_integer() else str(value)
 
 
 def find_high_cosine_cross_class_pairs(
@@ -99,56 +119,92 @@ def find_high_cosine_cross_class_pairs(
 
 def plot_cross_class_pairs(
     X: np.ndarray,
-    y: np.ndarray,
-    pairs: list[tuple[int, int, float]],
+    pair_table: pd.DataFrame,
     image_shape: tuple[int, int] | None = None,
     output_path: str | Path | None = None,
     show: bool = True,
 ) -> plt.Figure:
-    """Desenha os pares mais similares como imagens 2D, lado a lado."""
+    """Desenha os quatro pares persistidos mais similares em uma grade 2×2.
+
+    ``pair_table`` é a fonte de verdade para classes, índices e métricas. Esta
+    função somente recupera os pixels dos índices informados e não recalcula
+    similaridades ou distâncias.
+    """
     X = np.asarray(X)
-    y = np.asarray(y).ravel()
-    if not pairs:
+    missing_columns = set(PAIR_COLUMNS) - set(pair_table.columns)
+    if missing_columns:
+        raise ValueError(f"Tabela de pares sem colunas: {sorted(missing_columns)}")
+    if pair_table.empty:
         raise ValueError("Nenhum par foi fornecido para a visualização.")
     if image_shape is None:
         image_shape = infer_image_shape(X.shape[1])
 
-    fig, axes = plt.subplots(
-        len(pairs), 2, figsize=(5.5, 2.7 * len(pairs)), squeeze=False
+    # A tabela continua completa para auditoria; a figura usa somente os quatro
+    # primeiros registros, já ordenados pela similaridade na etapa original.
+    pair_table = pair_table.head(PUBLISHED_PAIR_COUNT).copy()
+    num_pairs = len(pair_table)
+    num_rows = math.ceil(num_pairs / PAIRS_PER_ROW)
+    # Largura padrão da área que ocupa duas colunas em IEEEtran. As imagens
+    # ficam próximas de 0,8 in de lado e os cabeçalhos mantêm 7,6 pt.
+    figure_height = max(3.55, 0.18 + 1.52 * num_rows)
+    fig = plt.figure(
+        figsize=(IEEE_TWO_COLUMN_WIDTH_IN, figure_height),
+        facecolor="white",
     )
-    for row, (first_index, second_index, similarity) in enumerate(pairs):
-        distance = 1 - similarity
-        for axis, index, title in (
-            (
-                axes[row, 0],
-                first_index,
-                f"A: classe {y[first_index]} | índice {first_index}\n"
-                f"sim.={similarity:.4f}; dist.={distance:.4f}",
-            ),
-            (
-                axes[row, 1],
-                second_index,
-                f"B: classe {y[second_index]} | índice {second_index}",
-            ),
-        ):
+    pair_grid = fig.add_gridspec(
+        num_rows,
+        PAIRS_PER_ROW,
+        left=0.025,
+        right=0.975,
+        bottom=0.055,
+        top=0.93,
+        wspace=0.06,
+        hspace=0.26,
+    )
+
+    for pair_number, pair in pair_table.reset_index(drop=True).iterrows():
+        row, column = divmod(pair_number, PAIRS_PER_ROW)
+        pair_slot = pair_grid[row, column]
+        image_grid = pair_slot.subgridspec(1, 2, wspace=0.035)
+        first_index = int(pair["indice_a"])
+        second_index = int(pair["indice_b"])
+
+        for image_column, index in enumerate((first_index, second_index)):
+            axis = fig.add_subplot(image_grid[0, image_column])
             # Os pixels foram serializados por coluna; a transposição restaura
             # a orientação visual original da imagem 20×20.
             axis.imshow(X[index].reshape(image_shape).T, cmap="gray")
-            axis.set_title(title)
             axis.axis("off")
 
-    fig.suptitle(
-        "Classes distintas com alta similaridade de cosseno\n"
-        "O vetor é semelhante, mas o arranjo espacial 2D é diferente.",
-        y=0.995,
-    )
-    fig.tight_layout(rect=(0, 0, 1, 0.96))
+        pair_bounds = pair_slot.get_position(fig)
+        fig.text(
+            (pair_bounds.x0 + pair_bounds.x1) / 2,
+            pair_bounds.y1 + 0.012,
+            "classe "
+            f"{format_class_label(pair['classe_a'])} vs "
+            f"{format_class_label(pair['classe_b'])}\n"
+            f"cos={pair['similaridade_cosseno']:.4f}",
+            ha="center",
+            va="bottom",
+            fontsize=8.2,
+            fontweight="normal",
+            linespacing=0.9,
+        )
 
     if output_path is not None:
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(output_path, dpi=150)
-        print(f"Figura salva em: {output_path}")
+        output_paths = [output_path]
+        if output_path.suffix.lower() != ".pdf":
+            output_paths.append(output_path.with_suffix(".pdf"))
+        for path in output_paths:
+            fig.savefig(
+                path,
+                dpi=300,
+                bbox_inches="tight",
+                facecolor="white",
+            )
+            print(f"Figura salva em: {path}")
     if show:
         plt.show()
     else:
@@ -195,12 +251,36 @@ def run_cosine_similarity_experiment(
 
     plot_cross_class_pairs(
         X,
-        y,
-        pairs,
+        result,
         output_path=figure_path,
         show=show,
     )
     return result
+
+
+def regenerate_cross_class_pairs_figure(
+    data_path: str | Path,
+    pair_table_path: str | Path,
+    figure_path: str | Path,
+    show: bool = False,
+) -> pd.DataFrame:
+    """Gera a figura a partir da tabela persistida, sem nova busca de pares."""
+    data = pd.read_csv(data_path, header=None)
+    X = data.iloc[:, :-1].to_numpy()
+    y = data.iloc[:, -1].to_numpy()
+    pair_table = pd.read_csv(pair_table_path)
+
+    missing_columns = set(PAIR_COLUMNS) - set(pair_table.columns)
+    if missing_columns:
+        raise ValueError(f"Tabela de pares sem colunas: {sorted(missing_columns)}")
+    for pair in pair_table.itertuples(index=False):
+        if not (0 <= pair.indice_a < len(X) and 0 <= pair.indice_b < len(X)):
+            raise ValueError("A tabela contém índice fora dos limites dos dados.")
+        if y[pair.indice_a] != pair.classe_a or y[pair.indice_b] != pair.classe_b:
+            raise ValueError("As classes persistidas não correspondem aos índices informados.")
+
+    plot_cross_class_pairs(X, pair_table, output_path=figure_path, show=show)
+    return pair_table
 
 
 if __name__ == "__main__":
@@ -211,10 +291,22 @@ if __name__ == "__main__":
     parser.add_argument("--data-path", type=Path, default=DEFAULT_DATA_PATH)
     parser.add_argument("--figure-path", type=Path, default=DEFAULT_FIGURE_PATH)
     parser.add_argument("--table-path", type=Path, default=DEFAULT_TABLE_PATH)
-    args = parser.parse_args()
-    run_cosine_similarity_experiment(
-        data_path=args.data_path,
-        top_k=args.top_k,
-        figure_path=args.figure_path,
-        table_path=args.table_path,
+    parser.add_argument(
+        "--pairs-table",
+        type=Path,
+        help="Regenera a figura da tabela existente, sem recalcular os pares.",
     )
+    args = parser.parse_args()
+    if args.pairs_table is not None:
+        regenerate_cross_class_pairs_figure(
+            data_path=args.data_path,
+            pair_table_path=args.pairs_table,
+            figure_path=args.figure_path,
+        )
+    else:
+        run_cosine_similarity_experiment(
+            data_path=args.data_path,
+            top_k=args.top_k,
+            figure_path=args.figure_path,
+            table_path=args.table_path,
+        )
