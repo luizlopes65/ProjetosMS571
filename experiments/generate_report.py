@@ -1,10 +1,10 @@
 """Executa os experimentos e gera um relatório final reproduzível.
 
 Exemplo rápido:
-    python experiments/generate_report.py --iterations 2 --optimizer-iterations 2
+    uv run python experiments/generate_report.py --iterations 2 --optimizer-iterations 2
 
 Execução completa:
-    python experiments/generate_report.py
+    uv run python experiments/generate_report.py
 """
 from __future__ import annotations
 
@@ -36,6 +36,7 @@ from experiments.error_cases_viz import run_error_cases_visualization
 from experiments.gradient_check import gradient_check
 from experiments.lambda_search import LAMBDA_LIST, plot_validation_error, search_lambda
 from experiments.learning_curve import run_learning_curve
+from experiments.optimizer_comparison_graphs import plot_optimizer_comparison
 from experiments.visualize_neurons import create_activation_gif
 from train import get_data_partitioned, predict_model, train_model
 
@@ -119,7 +120,6 @@ def _write_report(
     lambda_result,
     learning_result,
     cosine_result,
-    optimizer_results,
     optimizer_evaluations,
     test_accuracy,
 ):
@@ -189,6 +189,7 @@ def _write_report(
             "- [Pares interclasse por similaridade de cosseno](figures/cosine_cross_class_pairs.png)",
             "- [Evolução dos pesos](figures/activation_evolution.gif)",
             "- [Casos classificados incorretamente](figures/error_cases.png)",
+            "- [Comparação dos otimizadores](figures/optimizer_comparison.png)",
             "",
             "### Tabelas",
             "",
@@ -347,6 +348,10 @@ def generate_report(
         tables_dir / "optimizer_comparison.csv",
         tables_dir / "optimizer_comparison.md",
     )
+    plot_optimizer_comparison(
+        tables_dir / "optimizer_comparison.csv",
+        figures_dir / "optimizer_comparison.png",
+    )
 
     config = {
         "data_path": data_path,
@@ -369,7 +374,6 @@ def generate_report(
         },
         learning_result,
         cosine_result,
-        optimizer_results,
         optimizer_evaluations,
         test_accuracy,
     )

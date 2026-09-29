@@ -5,7 +5,7 @@ em 20×20. Assim, evidencia que o cosseno nos pixels não representa a estrutura
 espacial que uma CNN pode explorar.
 
 Uso:
-    .venv/bin/python experiments/cosine_similarity_cases.py
+    uv run python experiments/cosine_similarity_cases.py
 """
 
 from __future__ import annotations
@@ -24,8 +24,12 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 DEFAULT_DATA_PATH = PROJECT_ROOT / "processed_data.csv"
-DEFAULT_FIGURE_PATH = PROJECT_ROOT / "visualizations" / "cosine_cross_class_pairs.png"
-DEFAULT_TABLE_PATH = PROJECT_ROOT / "visualizations" / "cosine_cross_class_pairs.csv"
+DEFAULT_FIGURE_PATH = (
+    PROJECT_ROOT / "results" / "figures" / "cosine_cross_class_pairs.png"
+)
+DEFAULT_TABLE_PATH = (
+    PROJECT_ROOT / "results" / "tables" / "cosine_cross_class_pairs.csv"
+)
 PAIR_COLUMNS = (
     "indice_a",
     "classe_a",

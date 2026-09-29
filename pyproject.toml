@@ -1,7 +1,7 @@
 [project]
 name = "projetosms571"
 version = "0.1.0"
-description = "Add your description here"
+description = "Rede neural multicamada para classificação de imagens em MS571"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

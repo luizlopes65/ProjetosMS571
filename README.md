@@ -1,73 +1,109 @@
-# ProjetosMS571
+# Projetos MS571 — rede neural para imagens
 
-Projeto de uma rede neural para classificação de imagens, com suporte a diferentes arquiteturas, regularização e comparação entre otimizadores.
+Implementação didática, em NumPy, de uma rede neural multicamada para
+classificar imagens 20 × 20. O projeto inclui pré-processamento, treino com
+gradient descent, busca de regularização, gradient checking, comparação com
+conjugate gradient e geração de figuras.
 
-## Instalação
+## Executar do zero
 
-O projeto usa Python 3.12 ou superior. Com `uv`:
+Os comandos abaixo devem ser executados na raiz do repositório. É necessário
+ter [Python 3.12](https://www.python.org/downloads/) e
+[uv](https://docs.astral.sh/uv/) instalados.
 
 ```bash
+git clone https://github.com/luizlopes65/ProjetosMS571.git
+cd ProjetosMS571
 uv sync
+uv run python preprocess_data.py
+uv run python train.py --iterations 10
 ```
 
-## Executar o treinamento
+O último comando é uma verificação rápida do fluxo completo. Ele mostra o
+custo final e a acurácia no conjunto de teste. Para o treinamento padrão de
+800 iterações, remova `--iterations 10`:
 
 ```bash
-python train.py
+uv run python train.py
 ```
 
-A arquitetura padrão usa 400 entradas, uma camada oculta com 25 neurônios e 10 classes.
+`preprocess_data.py` lê `data/images.csv` e `data/labels.csv`, converte os
+valores com vírgula decimal e cria `processed_data.csv`. O arquivo processado
+já acompanha o repositório, mas executar a etapa torna a origem dos dados e a
+reprodução explícitas.
 
-Para testar outra arquitetura, use `train_model` com `hidden_layer_sizes`, por exemplo:
+## Verificar a implementação
 
-```python
-train_model(X, y, hidden_layer_sizes=[25, 15])
-```
-
-## Gradient check
-
-Verifica os gradientes do backpropagation comparando-os com diferenciação numérica:
+O gradient checking compara o backpropagation com diferenças finitas em redes
+pequenas. Todos os casos devem terminar com `TODOS OS TESTES PASSARAM`.
 
 ```bash
-python experiments/gradient_check.py
+uv run python experiments/gradient_check.py
+uv run python -m unittest discover -s tests -v
 ```
 
-## Gerar figuras, tabelas e relatório
+## Gerar os experimentos
 
-O script abaixo executa os experimentos principais e gera um relatório completo:
-
-```bash
-python experiments/generate_report.py
-```
-
-Os resultados são salvos em `results/`:
-
-- `REPORT.md`: resumo dos experimentos e links para os arquivos gerados;
-- `figures/`: gráficos e GIFs;
-- `tables/`: tabelas em CSV e Markdown.
-
-Para uma execução rápida:
+Para uma execução de fumaça que gera relatório, tabelas e figuras sem alterar
+os artefatos de referência em `results/`, use um diretório local:
 
 ```bash
-python experiments/generate_report.py \
-  --iterations 10 \
-  --optimizer-iterations 5 10 \
+uv run python experiments/generate_report.py \
+  --iterations 1 \
+  --optimizer-iterations 1 \
   --output-dir results-smoke
 ```
 
-A arquitetura e a seed também podem ser configuradas:
+O relatório é criado em `results-smoke/REPORT.md`. Mesmo esta execução roda
+todas as análises; ela é destinada a validar o fluxo, não a medir desempenho.
+Para gerar os resultados completos, execute (a duração depende da máquina):
 
 ```bash
-python experiments/generate_report.py \
-  --hidden-layer-sizes 25 15 \
-  --seed 42
+uv run python experiments/generate_report.py --output-dir results-local
 ```
 
-## Principais experimentos
+Os resultados completos ficam em `results-local/`:
 
-- busca do parâmetro de regularização `lambda`;
-- curvas de aprendizado;
-- evolução dos pesos dos neurônios;
-- casos classificados incorretamente;
-- comparação entre gradient descent e conjugate gradient;
-- verificação numérica dos gradientes.
+- `REPORT.md`: configuração, métricas e links para os artefatos;
+- `figures/`: busca de λ, curva de aprendizado, erros, pesos e otimizadores;
+- `tables/`: gradient check, pares de cosseno e comparação de otimizadores.
+
+## Comandos úteis
+
+```bash
+# Usar somente os primeiros 100 exemplos durante uma inspeção rápida.
+uv run python preprocess_data.py --limit 100 --output /tmp/dataset.csv
+
+# Alterar arquitetura, regularização e seed do treino.
+uv run python train.py \
+  --hidden-layer-sizes 25 15 \
+  --lambda 0.1 \
+  --seed 42
+
+# Recriar somente o gráfico de comparação a partir de uma tabela existente.
+uv run python experiments/optimizer_comparison_graphs.py \
+  --input results-local/tables/optimizer_comparison.csv \
+  --output results-local/figures/optimizer_comparison.png
+```
+
+Consulte [a documentação dos experimentos](docs/EXPERIMENTS.md) para a
+descrição de cada análise, entradas e arquivos produzidos.
+
+## Estrutura do projeto
+
+```text
+data/               dados brutos: imagens e rótulos
+docs/               documentação de execução e experimentos
+experiments/        análises reproduzíveis e geração de relatório
+results/            artefatos de referência já gerados
+tests/              testes automatizados do fluxo principal
+preprocess_data.py  conversão dos CSVs brutos
+train.py            particionamento, treino e avaliação
+utils.py            forward pass, custo, backpropagation e gradient descent
+```
+
+## Reprodutibilidade
+
+`uv.lock` fixa as versões das dependências. Os comandos usam `uv run` para
+garantir que o Python e as bibliotecas do ambiente do projeto sejam usados.
+As sementes padrão tornam as partições e as inicializações reproduzíveis.

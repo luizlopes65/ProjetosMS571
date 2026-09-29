@@ -16,7 +16,7 @@ from experiments.lambda_search import LAMBDA_LIST, search_lambda
 from train import predict_model, train_model
 
 PROCESSED_DATA_PATH = PROJECT_ROOT / "processed_data.csv"
-VISUALIZATIONS_DIR = PROJECT_ROOT / "visualizations"
+FIGURES_DIR = PROJECT_ROOT / "results" / "figures"
 
 
 DEFAULT_VALIDATION_SIZE = 1_000
@@ -32,8 +32,8 @@ HIDDEN_LAYER_SIZES = [25]
 ITERATIONS = 800
 LEARNING_RATE = 0.8
 LAMBDA_CANDIDATES = LAMBDA_LIST
-OUTPUT_PATH = VISUALIZATIONS_DIR / "learning_curve.png"
-PARTITION_CURVES_OUTPUT_PATH = VISUALIZATIONS_DIR / "learning_curve_by_train_size.png"
+OUTPUT_PATH = FIGURES_DIR / "learning_curve.png"
+PARTITION_CURVES_OUTPUT_PATH = FIGURES_DIR / "learning_curve_by_train_size.png"
 
 
 def split_train_and_validation(
