@@ -12,7 +12,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from train import get_data_partitioned, train_model
 
-VISUALIZATIONS_DIR = PROJECT_ROOT / "visualizations"
+FIGURES_DIR = PROJECT_ROOT / "results" / "figures"
 
 
 def normalize(image):
@@ -95,7 +95,7 @@ def plot_activation_images(
 
 def create_activation_gif(
     snapshots,
-    output_path=VISUALIZATIONS_DIR / "activation_evolution.gif",
+    output_path=FIGURES_DIR / "activation_evolution.gif",
     layer_index=0,
     input_shape=None,
 ):

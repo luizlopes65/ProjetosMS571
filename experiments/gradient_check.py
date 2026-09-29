@@ -9,8 +9,8 @@ O teste é rodado com 1 camada escondida (a arquitetura sugerida no PDF,
 exercita a propagação do erro entre camadas intermediárias.
 
 Uso:
-    python experiments/gradient_check.py            # usa as arquiteturas padrão
-    python experiments/gradient_check.py 3 5 4 3    # ou passe sua arquitetura
+    uv run python experiments/gradient_check.py            # arquiteturas padrão
+    uv run python experiments/gradient_check.py 3 5 4 3    # arquitetura própria
 """
 import sys
 from pathlib import Path

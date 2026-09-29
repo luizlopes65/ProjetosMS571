@@ -12,7 +12,8 @@ from train import get_data_partitioned, predict_model, train_model
 
 
 LAMBDA_LIST = [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1, 3, 10]
-DEFAULT_PLOT_PATH = PROJECT_ROOT / "visualizations" / "lambda_search_costs.png"
+DEFAULT_FIGURES_DIR = PROJECT_ROOT / "results" / "figures"
+DEFAULT_PLOT_PATH = DEFAULT_FIGURES_DIR / "lambda_search_costs.png"
 
 
 def classification_cost(X, y, thetas, num_labels):
@@ -226,5 +227,5 @@ if __name__ == "__main__":
         LAMBDA_LIST,
         validation_accuracy,
         best_lambda,
-        output_path=PROJECT_ROOT / "visualizations" / "validation_error_vs_lambda.png",
+        output_path=DEFAULT_FIGURES_DIR / "validation_error_vs_lambda.png",
     )
