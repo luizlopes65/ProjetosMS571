@@ -1,0 +1,14 @@
+[project]
+name = "proj2"
+version = "0.1.0"
+description = "Projeto 2 de Introdução a Machine Learning"
+authors = [{ name = "Luiz Lopes" }]
+requires-python = ">=3.12,<4.0"
+dependencies = ["numpy>=1.20,<3.0", "scipy (>=1.18.1,<2.0.0)", "matplotlib (>=3.11.2,<4.0.0)"]
+
+[tool.poetry]
+package-mode = false
+
+[build-system]
+requires = ["poetry-core>=1.8.0"]
+build-backend = "poetry.core.masonry.api"

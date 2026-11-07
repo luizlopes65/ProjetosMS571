@@ -1,8 +1,9 @@
 import numpy as np
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import ImageGrid
 
 
 def find_closest_centroids(X, centroids):
-    """Atribui cada exemplo ao centróide de distância euclidiana mínima."""
     squared_distances = np.sum(
         (X[:, np.newaxis, :] - centroids[np.newaxis, :, :]) ** 2,
         axis=2,
@@ -11,7 +12,6 @@ def find_closest_centroids(X, centroids):
 
 
 def compute_centroids(X, assignments, k):
-    """Calcula os ``k`` centróides a partir das atribuições de cada exemplo."""
     centroids = np.empty((k, X.shape[1]), dtype=float)
     for centroid_index in range(k):
         points = X[assignments == centroid_index]
@@ -22,7 +22,6 @@ def compute_centroids(X, assignments, k):
 
 
 def initialize_centroids(X, k, random_state=None):
-    """Seleciona ``k`` exemplos distintos de ``X`` como centróides iniciais."""
     if k > len(X):
         raise ValueError("k não pode ser maior que a quantidade de exemplos.")
     rng = np.random.default_rng(random_state)
@@ -30,7 +29,6 @@ def initialize_centroids(X, k, random_state=None):
 
 
 def kmeans(X, k, num_iters=100, random_state=None):
-    """Executa K-Means e retorna centróides e atribuições de 0 a ``k - 1``."""
     centroids = initialize_centroids(X, k, random_state)
     for _ in range(num_iters):
         assignments = find_closest_centroids(X, centroids)
@@ -45,21 +43,52 @@ def kmeans(X, k, num_iters=100, random_state=None):
 def feature_normalize(X):
     mu = np.mean(X, axis=0)
     sigma = np.std(X, axis=0)
-    return (X - mu) / sigma, mu, sigma
+    normalized = np.zeros_like(X, dtype=float)
+    np.divide(X - mu, sigma, out=normalized, where=sigma != 0)
+    return normalized, mu, sigma
 
 
 def pca(X):
-    covariance = X.T @ X / X.shape[0]
+    covariance = np.dot(X.T, X) / X.shape[0]
     return np.linalg.svd(covariance)
 
 
 def project_data(X, U, k):
-    return X @ U[:, :k]
+    return np.dot(X, U[:, :k])
 
 
 def recover_data(Z, U, k):
-    return Z @ U[:, :k].T
+    return np.dot(Z, U[:, :k].T)
 
+def show_image(array, ind):
+    plt.imshow(np.reshape(array[ind],(32,32)))
+    plt.show()
+
+def show_N_images(imgs, N, show=True):
+    N = min(N, len(imgs))
+    if N <= 0:
+        raise ValueError("N precisa ser maior que zero e imgs não pode estar vazio.")
+
+    ncols = int(np.ceil(np.sqrt(N)))
+    nrows = int(np.ceil(N / ncols))
+    fig = plt.figure(figsize=(ncols, nrows))
+
+    grid = ImageGrid(
+        fig, 111,
+        nrows_ncols=(nrows, ncols),
+        axes_pad=0.1,
+        )
+
+    axes = list(grid)
+    for ax, im in zip(axes, imgs[:N]):
+        ax.imshow(im, cmap="gray")
+        ax.axis("off")
+
+    for ax in axes[N:]:
+        ax.set_visible(False)
+
+    if show:
+        plt.show()
 
 def cofi_cost_function(params, Y, R, num_users, num_movies, num_features, regularization):
 
