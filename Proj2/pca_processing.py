@@ -12,6 +12,7 @@ def main():
 
     show_N_images(originals, 100, show=True)
 
+
     X, mu, sigma = feature_normalize(faces)
     print("Dados normalizados")
 
