@@ -34,9 +34,9 @@ def main():
         jac=True,
         options={'maxiter': 100, 'disp': True}
     ) 
-    # O prof pediu pra usar o gradiente conjugado então eu usei a função do scipy, 
-    # mas não sei se ele quer que preserve aquela ideia de atualizar Theta e X
-    # alternadamente, pq acho que essa função faz tudo ao mesmo tempo
+
+    if not result.success or not np.isfinite(result.x).all():
+        raise RuntimeError(f"O otimizador não convergiu: {result.message}")
 
     optimized_parameters = result.x
     X_opt = optimized_parameters[:(n_m * n_features)].reshape(n_m, n_features)
