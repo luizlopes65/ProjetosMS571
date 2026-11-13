@@ -1,7 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import ImageGrid
+from pathlib import Path
 
+OUTPUT_DIR = Path(__file__).parent / "results" / "pca"
 
 def find_closest_centroids(X, centroids):
     squared_distances = np.sum(
