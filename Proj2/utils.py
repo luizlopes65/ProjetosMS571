@@ -61,7 +61,7 @@ def recover_data(Z, U, k):
     return np.dot(Z, U[:, :k].T)
 
 def show_image(array, ind):
-    plt.imshow(np.reshape(array[ind],(32,32)))
+    plt.imshow(np.reshape(array[ind], (32, 32)).T, cmap="gray")
     plt.show()
 
 def show_N_images(imgs, N, show=True):
