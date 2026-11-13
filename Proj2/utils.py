@@ -152,3 +152,47 @@ def gradient_descent(
         cost_history.append(cost)
 
     return params, cost_history
+
+
+
+def save_summary_panel(originals, eigenfaces, reconstructions):
+    row_titles = [
+        "Eigenfaces (PCs 1–9)",
+        "Originais",
+        "Reconstruções (100 PCs)",
+    ]
+    images_by_row = (eigenfaces[:9], originals[:9], reconstructions[:9])
+    fig, axes = plt.subplots(3, 9, figsize=(20, 8))
+
+    for row, images in enumerate(images_by_row):
+        for col, image in enumerate(images):
+            axes[row, col].imshow(image, cmap="gray")
+            axes[row, col].axis("off")
+            if row == 0:
+                axes[row, col].set_title(f"PC {col + 1}", fontsize=13)
+            elif row == 1:
+                axes[row, col].set_title(f"Exemplo {col + 1}", fontsize=13)
+
+    fig.suptitle("PCA: eigenfaces e reconstruções", fontsize=22)
+    fig.subplots_adjust(left=0.17, right=0.995, top=0.88, bottom=0.04, wspace=0.06, hspace=0.16)
+    for row, title in enumerate(row_titles):
+        position = axes[row, 0].get_position()
+        fig.text(
+            0.16, position.y0 + position.height / 2, title,
+            ha="right", va="center", fontsize=14,
+        )
+
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    for row, label in ((0, "A"), (1, "B")):
+        title_box = axes[row, 0].title.get_window_extent(renderer)
+        title_center_y = fig.transFigure.inverted().transform(title_box.get_points().mean(axis=0))[1]
+        fig.text(
+            0.16, title_center_y, label,
+            ha="right", va="center", fontsize=24, fontweight="bold",
+        )
+    panel_path = OUTPUT_DIR / "pca_summary_9.png"
+    fig.savefig(panel_path, dpi=200, bbox_inches="tight")
+    plt.show()
+    print(f"Painel resumido salvo em: {panel_path}")
+
