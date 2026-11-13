@@ -64,7 +64,7 @@ def show_image(array, ind):
     plt.imshow(np.reshape(array[ind], (32, 32)).T, cmap="gray")
     plt.show()
 
-def show_N_images(imgs, N, show=True):
+def show_N_images(imgs, N, show=True, save_path=None, title=None):
     N = min(N, len(imgs))
     if N <= 0:
         raise ValueError("N precisa ser maior que zero e imgs não pode estar vazio.")
@@ -86,6 +86,11 @@ def show_N_images(imgs, N, show=True):
 
     for ax in axes[N:]:
         ax.set_visible(False)
+
+    if title:
+        fig.suptitle(title)
+    if save_path is not None:
+        fig.savefig(save_path, bbox_inches="tight")
 
     if show:
         plt.show()
