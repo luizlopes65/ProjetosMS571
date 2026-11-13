@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.io import loadmat
 
-from utils import kmeans, pca, project_data
+from utils import kmeans, pca, project_data, show_N_images
 
 
 DATA_PATH = Path(__file__).parent / "data" / "face_data.mat"
@@ -16,6 +16,14 @@ K_VALUES = range(1, 9)
 N_CLUSTERS = 4
 IMAGES_PER_CLUSTER = 12
 RANDOM_STATE = 42
+
+plt.rcParams.update({
+    "font.family": "Helvetica",
+    "font.size": 14,
+    "axes.titlesize": 16,
+    "axes.labelsize": 14,
+    "legend.fontsize": 12,
+})
 
 
 def make_contact_sheet(images):
@@ -36,6 +44,55 @@ def make_contact_sheet(images):
         sheet[y : y + image_size, x : x + image_size] = image
 
     return sheet
+
+
+def save_individual_visualizations(ks, inertias, projected_faces, labels, images):
+    fig, axis = plt.subplots(figsize=(8, 6))
+    axis.plot(ks, np.array(inertias) / 1e9, marker="o", label="Inércia")
+    axis.axvline(
+        N_CLUSTERS, color="tab:red", linestyle="--",
+        label=f"k escolhido = {N_CLUSTERS}",
+    )
+    axis.scatter(
+        [N_CLUSTERS], [inertias[ks.index(N_CLUSTERS)] / 1e9],
+        color="tab:red", zorder=3,
+    )
+    axis.set_xticks(ks)
+    axis.set_xlabel("Número de clusters (k)")
+    axis.set_ylabel("Inércia (× 10⁹)")
+    axis.set_title("Curva do cotovelo")
+    axis.grid(True, alpha=0.25)
+    axis.legend()
+    fig.savefig(OUTPUT_DIR / "elbow.png", dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+    fig = plt.figure(figsize=(8, 7))
+    axis = fig.add_subplot(111, projection="3d")
+    for cluster in range(N_CLUSTERS):
+        members = labels == cluster
+        axis.scatter(
+            projected_faces[members, 0],
+            projected_faces[members, 1],
+            projected_faces[members, 2],
+            label=f"Cluster {cluster + 1}",
+            s=12,
+        )
+    axis.set(xlabel="PC 1", ylabel="PC 2", zlabel="PC 3")
+    axis.set_title("Projeção PCA 3D das imagens")
+    axis.legend(title="K-means nos 1.024 pixels", fontsize=9, title_fontsize=9)
+    fig.savefig(OUTPUT_DIR / "clusters_3d.png", dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+    for cluster in range(N_CLUSTERS):
+        members = images[labels == cluster]
+        show_N_images(
+            members,
+            IMAGES_PER_CLUSTER,
+            show=False,
+            save_path=OUTPUT_DIR / f"cluster_{cluster + 1}.png",
+            title=f"Cluster {cluster + 1} ({len(members)} imagens)",
+        )
+        plt.close()
 
 
 def main():
@@ -118,6 +175,7 @@ def main():
 
     panel_path = OUTPUT_DIR / "painel_clusters.png"
     fig.savefig(panel_path, dpi=200, bbox_inches="tight")
+    save_individual_visualizations(ks, inertias, projected_faces, labels, images)
     plt.show()
     print(f"Painel salvo em: {panel_path}")
 
