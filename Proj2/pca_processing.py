@@ -35,7 +35,38 @@ def main():
     X, mu, sigma = feature_normalize(faces)
     print("Dados normalizados")
 
-    U, _, _ = pca(X)
+    U, S, _ = pca(X)
+    components = np.arange(1, 37)
+    explained_variance = S / np.sum(S)
+    cumulative_variance = np.cumsum(explained_variance)
+
+    fig, axis = plt.subplots(figsize=(10, 6))
+    axis.bar(
+        components, explained_variance[:36] * 100,
+        alpha=0.7, label="Variância individual",
+    )
+    axis.plot(
+        components, cumulative_variance[:36] * 100,
+        color="tab:red", marker="o", markersize=4,
+        label="Variância acumulada",
+    )
+    axis.set_xticks(np.arange(1, 37, 5))
+    axis.set_xlabel("Componente principal")
+    axis.set_ylabel("Variância explicada (%)")
+    axis.set_title("Variância explicada pelas 36 primeiras PCs")
+    axis.grid(True, alpha=0.25)
+    axis.legend()
+    fig.savefig(
+        OUTPUT_DIR / "explained_variance_36.png",
+        dpi=200, bbox_inches="tight",
+    )
+    plt.show()
+
+    print(
+        "Variância explicada acumulada pelas 36 primeiras PCs: "
+        f"{cumulative_variance[35] * 100:.2f}%"
+    )
+
     eigenfaces = U[:, :36].T.reshape(-1, 32, 32).transpose(0, 2, 1)
     show_N_images(
         eigenfaces, 36, show=True,
