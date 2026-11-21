@@ -32,7 +32,7 @@ def main():
         args=(Y_norm, R, n_u, n_m, n_features, _lambda),
         method='CG',
         jac=True,
-        options={'maxiter': 100, 'disp': True}
+        options={'maxiter': 1000, 'disp': True}
     ) 
 
     if not result.success or not np.isfinite(result.x).all():
