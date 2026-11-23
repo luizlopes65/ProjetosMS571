@@ -19,7 +19,7 @@ def main():
     n_features = 100
     _lambda = 0.0
 
-    np.random.seed(42)
+    np.random.seed(31)
     X = np.random.randn(n_m, n_features) * 0.01
     Theta = np.random.randn(n_u, n_features) * 0.01
 
