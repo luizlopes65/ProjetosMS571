@@ -1,30 +1,13 @@
-"""Análise complementar da filtragem colaborativa (Projeto 2).
-
-Gera os artefatos usados na seção de Resultados: curva de convergência do
-gradiente conjugado, histograma de avaliações por filme, métricas de erro e a
-lista dos dez filmes de maior nota média predita.
-
-A inicialização aleatória é idêntica à de collaborative_filtering.py, de modo
-que o top-10 produzido aqui é o mesmo daquele script.
-"""
+"""Gera gráficos, métricas e rankings da filtragem colaborativa."""
 
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.io import loadmat
-from scipy.optimize import minimize
 
-from utils import cofi_cost_function, normalize_ratings
+from collaborative_filtering import TOP_N, load_movie_data, predict_ratings
 
-DATA_DIR = Path(__file__).parent / "data"
 OUTPUT_DIR = Path(__file__).parent / "results" / "recommender"
-
-N_FEATURES = 100
-REGULARIZATION = 0.0
-SEED = 31
-MAXITER = 1000
-TOP_N = 10
 MIN_RATINGS_FILTER = 20
 
 plt.rcParams.update({
@@ -46,45 +29,6 @@ def cientifica(valor, casas=2):
     mantissa, expoente = f"{valor:.{casas}e}".split("e")
     sobrescrito = str(int(expoente)).translate(str.maketrans("0123456789-", "⁰¹²³⁴⁵⁶⁷⁸⁹⁻"))
     return f"{mantissa.replace('.', ',')} × 10{sobrescrito}"
-
-
-def load_movie_names():
-    names = []
-    with open(DATA_DIR / "movie_names.txt", encoding="utf-8", errors="ignore") as f:
-        for line in f:
-            parts = line.strip().split(" ", 1)
-            if len(parts) == 2:
-                names.append(parts[1])
-    return names
-
-
-def fit_params(Y_norm, R, num_users, num_movies, history):
-    np.random.seed(SEED)
-    X = np.random.randn(num_movies, N_FEATURES) * 0.01
-    Theta = np.random.randn(num_users, N_FEATURES) * 0.01
-    initial = np.concatenate((X.ravel(), Theta.ravel()))
-
-    history.append(cofi_cost_function(
-        initial, Y_norm, R, num_users, num_movies, N_FEATURES, REGULARIZATION,
-    )[0])
-
-    def callback(xk):
-        history.append(cofi_cost_function(
-            xk, Y_norm, R, num_users, num_movies, N_FEATURES, REGULARIZATION,
-        )[0])
-
-    result = minimize(
-        fun=cofi_cost_function,
-        x0=initial,
-        args=(Y_norm, R, num_users, num_movies, N_FEATURES, REGULARIZATION),
-        method="CG",
-        jac=True,
-        callback=callback,
-        options={"maxiter": MAXITER, "disp": False},
-    )
-    if not result.success or not np.isfinite(result.x).all():
-        raise RuntimeError(f"O otimizador não convergiu: {result.message}")
-    return result, initial.size
 
 
 def plot_convergence(history, iterations):
@@ -214,24 +158,13 @@ def write_metrics(Y, R, predictions, history, iterations, n_params):
 def main():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    data = loadmat(DATA_DIR / "movie_data.mat")
-    Y, R = data["Y"], data["R"]
-    n_m, n_u = Y.shape
-    movie_names = load_movie_names()
-    if len(movie_names) != n_m:
-        raise ValueError(f"{len(movie_names)} nomes para {n_m} filmes")
-
-    Y_norm, Y_mean = normalize_ratings(Y, R)
+    Y, R, movie_names = load_movie_data()
     history = []
-    result, n_params = fit_params(Y_norm, R, n_u, n_m, history)
+    predictions, iterations, n_params = predict_ratings(Y, R, history)
 
-    X = result.x[: n_m * N_FEATURES].reshape(n_m, N_FEATURES)
-    Theta = result.x[n_m * N_FEATURES:].reshape(n_u, N_FEATURES)
-    predictions = X @ Theta.T + Y_mean
     scores = predictions.mean(axis=1)
     ratings_per_movie = R.sum(axis=1)
 
-    iterations = result.nit
     plot_convergence(history, iterations)
     plot_ratings_histogram(ratings_per_movie)
     write_top10(scores, ratings_per_movie, movie_names)

@@ -1,56 +1,81 @@
+"""Ajusta a filtragem colaborativa e imprime o ranking de filmes."""
+
+from pathlib import Path
+
 import numpy as np
 from scipy.io import loadmat
 from scipy.optimize import minimize
 
 from utils import cofi_cost_function, normalize_ratings
 
-def main():
-    movie_list = []
-    with open("data/movie_names.txt", 'r', encoding='utf-8', errors='ignore') as f:
+DATA_DIR = Path(__file__).parent / "data"
+N_FEATURES = 100
+REGULARIZATION = 0.0
+SEED = 31
+MAXITER = 1000
+TOP_N = 10
+
+
+def load_movie_names():
+    names = []
+    with open(DATA_DIR / "movie_names.txt", encoding="utf-8", errors="ignore") as f:
         for line in f:
-            parts = line.strip().split(' ', 1)
-            movie_list.append(parts[1])
+            parts = line.strip().split(" ", 1)
+            if len(parts) == 2:
+                names.append(parts[1])
+    return names
 
-    data = loadmat('data/movie_data.mat')
-    Y = data['Y']
-    R = data['R']
 
-    n_m, n_u = Y.shape
-    n_features = 100
-    _lambda = 0.0
+def predict_ratings(Y, R, history=None, *, display=False):
+    num_movies, num_users = Y.shape
+    Y_norm, means = normalize_ratings(Y, R)
+    rng = np.random.RandomState(SEED)
+    X = rng.randn(num_movies, N_FEATURES) * 0.01
+    theta = rng.randn(num_users, N_FEATURES) * 0.01
+    initial = np.concatenate((X.ravel(), theta.ravel()))
 
-    np.random.seed(31)
-    X = np.random.randn(n_m, n_features) * 0.01
-    Theta = np.random.randn(n_u, n_features) * 0.01
+    args = (Y_norm, R, num_users, num_movies, N_FEATURES, REGULARIZATION)
 
-    Y_norm, Y_mean = normalize_ratings(Y, R)
-    initial_parameters = np.concatenate((X.ravel(), Theta.ravel()))
-    
+    def record_cost(params):
+        history.append(cofi_cost_function(params, *args)[0])
+
+    if history is not None:
+        record_cost(initial)
+
     result = minimize(
         fun=cofi_cost_function,
-        x0=initial_parameters,
-        args=(Y_norm, R, n_u, n_m, n_features, _lambda),
-        method='CG',
+        x0=initial,
+        args=args,
+        method="CG",
         jac=True,
-        options={'maxiter': 1000, 'disp': True}
-    ) 
-
+        callback=record_cost if history is not None else None,
+        options={"maxiter": MAXITER, "disp": display},
+    )
     if not result.success or not np.isfinite(result.x).all():
         raise RuntimeError(f"O otimizador não convergiu: {result.message}")
+    split = num_movies * N_FEATURES
+    X = result.x[:split].reshape(num_movies, N_FEATURES)
+    theta = result.x[split:].reshape(num_users, N_FEATURES)
+    return X @ theta.T + means, result.nit, result.x.size
 
-    optimized_parameters = result.x
-    X_opt = optimized_parameters[:(n_m * n_features)].reshape(n_m, n_features)
-    Theta_opt = optimized_parameters[(n_m * n_features):].reshape(n_u, n_features)
 
-    predict = X_opt @ Theta_opt.T + Y_mean
+def load_movie_data():
+    data = loadmat(DATA_DIR / "movie_data.mat")
+    ratings, mask = data["Y"], data["R"]
+    names = load_movie_names()
+    if len(names) != ratings.shape[0]:
+        raise ValueError(f"{len(names)} nomes para {ratings.shape[0]} filmes")
+    return ratings, mask, names
 
-    movie_mean_score = np.mean(predict, axis=1)
 
-    top_10 = np.argsort(movie_mean_score)[-10:][::-1]
+def main():
+    ratings, mask, names = load_movie_data()
+    predictions, _, _ = predict_ratings(ratings, mask, display=True)
+    scores = predictions.mean(axis=1)
+    top_movies = np.argsort(scores)[-TOP_N:][::-1]
+    for rank, index in enumerate(top_movies, start=1):
+        print(f"{rank:2d}º - {names[index]} (Nota média: {scores[index]:.2f})")
 
-    for i, idx in enumerate(top_10, start=1):
-        nome_filme = movie_list[idx] 
-        print(f"{i:2d}º - {nome_filme} (Nota média: {movie_mean_score[idx]:.2f})")
 
 if __name__ == "__main__":
     main()
